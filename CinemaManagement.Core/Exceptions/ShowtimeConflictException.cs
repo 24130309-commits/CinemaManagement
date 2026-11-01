@@ -1,6 +1,9 @@
-﻿namespace CinemaManagement.Core.Exceptions;
+﻿using System;
 
-public class ShowtimeConflictException
+namespace CinemaManagement.Core.Exceptions
 {
-    
+    public class ShowtimeConflictException : Exception
+    {
+        public ShowtimeConflictException(string message) : base(message) { }
+    }
 }
