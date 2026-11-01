@@ -1,0 +1,95 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0-windows</TargetFramework>
+        <UseWindowsForms>true</UseWindowsForms>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\CinemaManagement.BLL\CinemaManagement.BLL.csproj" />
+      <ProjectReference Include="..\CinemaManagement.Core\CinemaManagement.Core.csproj" />
+      <ProjectReference Include="..\CinemaManagement.DAL\CinemaManagement.DAL.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Resources\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Forms\Auth\frmLogin.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Auth\frmChangePassword.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Main\frmMain.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Main\frmDashboard.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Catalog\frmMovieList.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Catalog\frmMovieEdit.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Catalog\frmRoomManage.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Catalog\frmSeatDesigner.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Sales\frmSelectMovie.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Sales\frmSeatSelection.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Sales\frmComboSelection.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Sales\frmCheckout.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Sales\frmTicketPreview.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Sales\frmInvoiceHistory.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Management\frmCustomerManage.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Management\frmProductManage.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Management\frmPromotionManage.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Management\frmPricingRule.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Management\frmUserManage.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Reports\frmRevenueReport.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Reports\frmOccupancyReport.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Management\frmSettings.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Catalog\frmShowtimeManage.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="Forms\Catalog\frmShowtimeEdit.cs">
+        <SubType>Form</SubType>
+      </Compile>
+    </ItemGroup>
+
+</Project>

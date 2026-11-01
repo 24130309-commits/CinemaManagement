@@ -1,0 +1,56 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v9.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "CinemaManagement.BLL/1.0.0": {
+        "dependencies": {
+          "CinemaManagement.Core": "1.0.0",
+          "CinemaManagement.DAL": "1.0.0"
+        },
+        "runtime": {
+          "CinemaManagement.BLL.dll": {}
+        }
+      },
+      "CinemaManagement.Core/1.0.0": {
+        "runtime": {
+          "CinemaManagement.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "CinemaManagement.DAL/1.0.0": {
+        "dependencies": {
+          "CinemaManagement.Core": "1.0.0"
+        },
+        "runtime": {
+          "CinemaManagement.DAL.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "CinemaManagement.BLL/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "CinemaManagement.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "CinemaManagement.DAL/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

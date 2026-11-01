@@ -1,0 +1,145 @@
+{
+  "version": 3,
+  "targets": {
+    "net9.0-windows7.0": {
+      "CinemaManagement.BLL/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "dependencies": {
+          "CinemaManagement.Core": "1.0.0",
+          "CinemaManagement.DAL": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/CinemaManagement.BLL.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/CinemaManagement.BLL.dll": {}
+        }
+      },
+      "CinemaManagement.Core/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "compile": {
+          "bin/placeholder/CinemaManagement.Core.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/CinemaManagement.Core.dll": {}
+        }
+      },
+      "CinemaManagement.DAL/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "dependencies": {
+          "CinemaManagement.Core": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/CinemaManagement.DAL.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/CinemaManagement.DAL.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "CinemaManagement.BLL/1.0.0": {
+      "type": "project",
+      "path": "../CinemaManagement.BLL/CinemaManagement.BLL.csproj",
+      "msbuildProject": "../CinemaManagement.BLL/CinemaManagement.BLL.csproj"
+    },
+    "CinemaManagement.Core/1.0.0": {
+      "type": "project",
+      "path": "../CinemaManagement.Core/CinemaManagement.Core.csproj",
+      "msbuildProject": "../CinemaManagement.Core/CinemaManagement.Core.csproj"
+    },
+    "CinemaManagement.DAL/1.0.0": {
+      "type": "project",
+      "path": "../CinemaManagement.DAL/CinemaManagement.DAL.csproj",
+      "msbuildProject": "../CinemaManagement.DAL/CinemaManagement.DAL.csproj"
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net9.0-windows7.0": [
+      "CinemaManagement.BLL >= 1.0.0",
+      "CinemaManagement.Core >= 1.0.0",
+      "CinemaManagement.DAL >= 1.0.0"
+    ]
+  },
+  "packageFolders": {
+    "C:\\Users\\PC\\.nuget\\packages\\": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "D:\\AppCinemaManagement\\CinemaManagement\\CinemaManagement.UI\\CinemaManagement.UI.csproj",
+      "projectName": "CinemaManagement.UI",
+      "projectPath": "D:\\AppCinemaManagement\\CinemaManagement\\CinemaManagement.UI\\CinemaManagement.UI.csproj",
+      "packagesPath": "C:\\Users\\PC\\.nuget\\packages\\",
+      "outputPath": "D:\\AppCinemaManagement\\CinemaManagement\\CinemaManagement.UI\\obj\\",
+      "projectStyle": "PackageReference",
+      "configFilePaths": [
+        "C:\\Users\\PC\\AppData\\Roaming\\NuGet\\NuGet.Config"
+      ],
+      "originalTargetFrameworks": [
+        "net9.0-windows"
+      ],
+      "sources": {
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net9.0-windows7.0": {
+          "framework": "net9.0-windows7.0",
+          "targetAlias": "net9.0-windows",
+          "projectReferences": {
+            "D:\\AppCinemaManagement\\CinemaManagement\\CinemaManagement.BLL\\CinemaManagement.BLL.csproj": {
+              "projectPath": "D:\\AppCinemaManagement\\CinemaManagement\\CinemaManagement.BLL\\CinemaManagement.BLL.csproj"
+            },
+            "D:\\AppCinemaManagement\\CinemaManagement\\CinemaManagement.Core\\CinemaManagement.Core.csproj": {
+              "projectPath": "D:\\AppCinemaManagement\\CinemaManagement\\CinemaManagement.Core\\CinemaManagement.Core.csproj"
+            },
+            "D:\\AppCinemaManagement\\CinemaManagement\\CinemaManagement.DAL\\CinemaManagement.DAL.csproj": {
+              "projectPath": "D:\\AppCinemaManagement\\CinemaManagement\\CinemaManagement.DAL\\CinemaManagement.DAL.csproj"
+            }
+          }
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      },
+      "SdkAnalysisLevel": "9.0.300"
+    },
+    "frameworks": {
+      "net9.0-windows7.0": {
+        "framework": "net9.0-windows7.0",
+        "targetAlias": "net9.0-windows",
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "frameworkReferences": {
+          "Microsoft.NETCore.App": {
+            "privateAssets": "all"
+          },
+          "Microsoft.WindowsDesktop.App.WindowsForms": {
+            "privateAssets": "none"
+          }
+        },
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.318/PortableRuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}

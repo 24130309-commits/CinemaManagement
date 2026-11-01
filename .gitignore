@@ -1,0 +1,23 @@
+﻿# Build results
+bin/
+obj/
+
+# Rider
+.idea/
+*.sln.iml
+*.DotSettings.user
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# User-specific files
+*.userprefs
+
+# Test results
+TestResults/
+
+# NuGet
+packages/
+*.nupkg
