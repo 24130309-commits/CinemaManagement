@@ -1,4 +1,4 @@
-﻿namespace CinemaManagement.Core.DTOS;
+﻿namespace CinemaManagement.Core.DTOs;
 
 public class RevenueByMovieDto
 {

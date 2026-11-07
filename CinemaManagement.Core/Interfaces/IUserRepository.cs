@@ -1,6 +1,10 @@
-﻿namespace CinemaManagement.Core.Interfaces;
+﻿using CinemaManagement.Core.Entities;
 
-public interface IUserRepository
+namespace CinemaManagement.Core.Interfaces;
+
+public interface IUserRepository : IRepository<User>
 {
-    
+    User GetByUsername(string username);
+    bool UpdatePassword(int id, string newHash);
+    bool SetActive(int id, bool isActive);
 }
