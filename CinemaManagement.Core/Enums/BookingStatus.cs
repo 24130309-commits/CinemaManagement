@@ -1,6 +1,9 @@
 ﻿namespace CinemaManagement.Core.Enums;
 
-public class BookingStatus
+public enum BookingStatus
 {
+    Pending,
+    Completed,
+    Cancled
     
 }
