@@ -2,7 +2,7 @@
 
 namespace CinemaManagement.UI.Forms.Management;
 
-partial class frmSettings
+public partial class frmTenForm : Form
 {
     /// <summary>
     /// Required designer variable.

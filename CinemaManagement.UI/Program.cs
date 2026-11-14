@@ -2,7 +2,7 @@
 using System.Windows.Forms;
 using CinemaManagement.UI.Forms.Auth;
 
-namespace CinemaManagement.UI
+namespace CinemaManagement.UI.Forms.Main
 {
     internal static class Program
     {
