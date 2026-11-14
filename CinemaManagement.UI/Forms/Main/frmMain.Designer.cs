@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel;
 
-namespace CinemaManagement.UI.Forms.Main;
+namespace CinemaManagement.UI.Forms;
 
 partial class frmMain
 {

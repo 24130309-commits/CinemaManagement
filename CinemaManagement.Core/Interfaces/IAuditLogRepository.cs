@@ -1,6 +1,6 @@
 ﻿namespace CinemaManagement.Core.Interfaces;
 
-public interface IAuditLogRepository
+public partial interface IAuditLogRepository
 {
     
 }

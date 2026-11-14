@@ -1,6 +1,6 @@
 ﻿namespace CinemaManagement.Core.Interfaces;
 
-public interface ISettingService
+public partial interface ISettingService
 {
     
 }

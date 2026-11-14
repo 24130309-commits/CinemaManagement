@@ -1,6 +1,6 @@
 ﻿namespace CinemaManagement.Core.Interfaces;
 
-public interface IReportService
+public partial interface IReportService
 {
     
 }
