@@ -1,4 +1,5 @@
 ﻿using System;
+using CinemaManagement.DAL.Database;
 using System.Collections.Generic;
 using Microsoft.Data.Sqlite;
 using CinemaManagement.Core.Entities;

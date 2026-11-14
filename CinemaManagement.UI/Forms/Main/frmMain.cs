@@ -6,7 +6,7 @@ using CinemaManagement.UI.Forms.Auth;
 using CinemaManagement.UI.Forms.Management;
 using CinemaManagement.UI.Forms.Reports;
 using CinemaManagement.UI.Helpers;
-using frmSettings = CinemaManagement.UI.Forms.Management.frmSettings;
+using frmSettings = CinemaManagement.UI.Forms.Management;
 
 namespace CinemaManagement.UI.Forms
 {
@@ -54,7 +54,7 @@ namespace CinemaManagement.UI.Forms
             AddMenuButton("Báo cáo Doanh thu", () => OpenChildForm(_formFactory.Create<frmRevenueReport>()));
             AddMenuButton("Tỷ lệ Lấp đầy Ghế", () => OpenChildForm(_formFactory.Create<frmOccupancyReport>()));
             AddMenuButton("Quản lý Tài khoản", () => OpenChildForm(_formFactory.Create<frmUserManage>()), adminOnly: true);
-            AddMenuButton("Cấu hình & Sao lưu", () => OpenChildForm(_formFactory.Create<frmSettings>()), adminOnly: true);
+            AddMenuButton("Cấu hình & Sao lưu", () => OpenChildForm(_formFactory.Create<Reports.frmSettings>()), adminOnly: true);
             AddMenuButton("Đổi mật khẩu", () => _formFactory.Create<frmChangePassword>().ShowDialog());
             AddMenuButton("Đăng xuất", () =>
             {

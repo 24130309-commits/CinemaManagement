@@ -1,41 +1,39 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.Linq;
+using System.Windows.Forms;
+using CinemaManagement.Core.Interfaces;
+using CinemaManagement.UI.Controls;
 
-namespace CinemaManagement.UI.Forms.Main;
-
-partial class frmDashboard
+namespace CinemaManagement.UI.Forms.Main
 {
-    /// <summary>
-    /// Required designer variable.
-    /// </summary>
-    private IContainer components = null;
-
-    /// <summary>
-    /// Clean up any resources being used.
-    /// </summary>
-    /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
-    protected override void Dispose(bool disposing)
+    public partial class frmDashboard : Form
     {
-        if (disposing && (components != null))
+        public frmDashboard(IReportService reportService)
         {
-            components.Dispose();
+            Padding = new Padding(20);
+
+            var revenues = reportService.GetRevenueByMovie(DateTime.Today.AddDays(-30), DateTime.Today).ToList();
+
+            var pnlCards = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 120 };
+            pnlCards.Controls.Add(new StatCard
+                { Title = "DOANH THU 30 NGÀY", Value = $"{revenues.Sum(x => x.TotalRevenue):N0} đ" });
+            pnlCards.Controls.Add(new StatCard
+                { Title = "VÉ ĐÃ BÁN", Value = revenues.Sum(x => x.TotalTicketsSold).ToString("N0") });
+            pnlCards.Controls.Add(new StatCard
+                { Title = "TỔNG SUẤT CHIẾU", Value = revenues.Sum(x => x.TotalShowtimes).ToString("N0") });
+
+            var dgv = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                ReadOnly = true,
+                AllowUserToAddRows = false,
+                DataSource = revenues
+            };
+
+            Controls.Add(dgv);
+            Controls.Add(pnlCards);
         }
-
-        base.Dispose(disposing);
     }
-
-    #region Windows Form Designer generated code
-
-    /// <summary>
-    /// Required method for Designer support - do not modify
-    /// the contents of this method with the code editor.
-    /// </summary>
-    private void InitializeComponent()
-    {
-        this.components = new System.ComponentModel.Container();
-        this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(800, 450);
-        this.Text = "frmDashboard";
-    }
-
-    #endregion
 }
+ 
