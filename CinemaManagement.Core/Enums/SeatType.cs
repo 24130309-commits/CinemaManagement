@@ -1,6 +1,9 @@
 ﻿namespace CinemaManagement.Core.Enums;
 
-public class SeatType
+public enum SeatType
 {
-    
+    Normal = 0,
+    VIP = 1,
+    Couple = 2,
+    Aisle = 3
 }

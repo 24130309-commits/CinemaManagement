@@ -1,66 +1,105 @@
-﻿using System;
-using System.Windows.Forms;
+﻿
+using CinemaManagement.BLL.Session;
+using CinemaManagement.Core.Interfaces;
+using CinemaManagement.UI.Helpers;
 
 namespace CinemaManagement.UI.Forms.Auth;
 
 public partial class frmChangePassword : Form
 {
-    // Mật khẩu giả để kiểm thử UI
-    private const string CurrentPassword = "123456";
+    private readonly IAuthService _auth;
+    private readonly CurrentUserSession _session;
+    private readonly IAuditService _audit;
+    private readonly TextBox _old = new(), _next = new(), _confirm = new();
 
-    public frmChangePassword()
+    public frmChangePassword(
+        IAuthService auth,
+        CurrentUserSession session,
+        IAuditService audit)
     {
+        _auth = auth;
+        _session = session;
+        _audit = audit;
+
         InitializeComponent();
+
+        BuildField("Mật khẩu hiện tại", _old, 70);
+        BuildField("Mật khẩu mới", _next, 145);
+        BuildField("Xác nhận mật khẩu mới", _confirm, 220);
+
+        _old.UseSystemPasswordChar =
+            _next.UseSystemPasswordChar =
+            _confirm.UseSystemPasswordChar = true;
+
+        var save = new Button
+        {
+            Text = "Lưu thay đổi",
+            Location = new Point(270, 310),
+            Size = new Size(130, 38)
+        };
+        save.Click += Save_Click;
+
+        var cancel = new Button
+        {
+            Text = "Hủy",
+            Location = new Point(410, 310),
+            Size = new Size(75, 38)
+        };
+        cancel.Click += (_, _) => Close();
+
+        Controls.AddRange([save, cancel]);
+        ThemeHelper.Apply(this);
     }
 
-    private void btnSave_Click(object sender, EventArgs e)
+    private void BuildField(string caption, TextBox box, int top)
     {
-        string oldPassword = txtOldPassword.Text;
-        string newPassword = txtNewPassword.Text;
-        string confirmPassword = txtConfirmPassword.Text;
-
-        if (string.IsNullOrWhiteSpace(oldPassword) ||
-            string.IsNullOrWhiteSpace(newPassword) ||
-            string.IsNullOrWhiteSpace(confirmPassword))
+        var label = new Label
         {
-            MessageBox.Show("Vui lòng nhập đầy đủ thông tin.");
-            return;
-        }
+            Text = caption,
+            Location = new Point(35, top),
+            AutoSize = true
+        };
 
-        if (oldPassword != CurrentPassword)
-        {
-            MessageBox.Show("Mật khẩu hiện tại không chính xác.");
-            return;
-        }
-
-        if (newPassword.Length < 6)
-        {
-            MessageBox.Show("Mật khẩu mới phải có ít nhất 6 ký tự.");
-            return;
-        }
-
-        if (newPassword != confirmPassword)
-        {
-            MessageBox.Show("Mật khẩu xác nhận không khớp.");
-            return;
-        }
-
-        MessageBox.Show(
-            "Đổi mật khẩu thành công!",
-            "Thông báo",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
-
-        Close();
+        box.SetBounds(35, top + 25, 450, 32);
+        Controls.AddRange([label, box]);
     }
 
-    private void btnCancel_Click(object sender, EventArgs e)
+    private void Save_Click(object? sender, EventArgs e)
     {
-        Close();
-    }
+        try
+        {
+            if (_session.User is null)
+            {
+                MessageHelper.Warning("Phiên đăng nhập đã hết hạn.");
+                Close();
+                return;
+            }
 
-    private void frmChangePassword_Load(object sender, EventArgs e)
-    {
-        throw new System.NotImplementedException();
+            if (_next.Text != _confirm.Text)
+            {
+                MessageHelper.Warning("Mật khẩu xác nhận không khớp.");
+                return;
+            }
+
+            if (!_auth.ChangePassword(
+                    _session.User.Id,
+                    _old.Text,
+                    _next.Text))
+            {
+                MessageHelper.Warning("Mật khẩu hiện tại không chính xác.");
+                return;
+            }
+
+            _audit.Log(
+                "CHANGE_PASSWORD",
+                "Người dùng đổi mật khẩu.");
+
+            MessageHelper.Info("Đổi mật khẩu thành công.");
+            Close();
+        }
+        catch (Exception ex)
+        {
+            MessageHelper.Handle(ex);
+        }
     }
 }

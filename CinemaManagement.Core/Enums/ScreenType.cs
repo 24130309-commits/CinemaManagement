@@ -1,6 +1,8 @@
 ﻿namespace CinemaManagement.Core.Enums;
 
-public class ScreenType
+public enum ScreenType
 {
-    
+    TwoD = 1,
+    ThreeD = 2,
+    IMAX = 3
 }
