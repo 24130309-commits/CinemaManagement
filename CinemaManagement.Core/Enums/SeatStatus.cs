@@ -1,6 +1,10 @@
 ﻿namespace CinemaManagement.Core.Enums;
 
-public class SeatStatus
+public enum SeatStatus
 {
+    Available,
+    Holding,
+    Booked,
+    Disabled    
     
 }
