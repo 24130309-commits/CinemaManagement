@@ -1,6 +1,6 @@
 ﻿namespace CinemaManagement.Core.Interfaces;
 
-public interface IExportService
+public partial interface IExportService
 {
     
 }

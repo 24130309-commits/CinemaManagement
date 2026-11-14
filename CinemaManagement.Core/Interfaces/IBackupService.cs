@@ -1,6 +1,6 @@
 ﻿namespace CinemaManagement.Core.Interfaces;
 
-public interface IBackupService
+public partial interface IBackupService
 {
     
 }

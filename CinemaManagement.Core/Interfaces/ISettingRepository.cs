@@ -1,6 +1,6 @@
 ﻿namespace CinemaManagement.Core.Interfaces;
 
-public interface ISettingRepository
+public partial interface ISettingRepository
 {
     
 }

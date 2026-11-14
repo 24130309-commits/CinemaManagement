@@ -1,6 +1,6 @@
 ﻿namespace CinemaManagement.Core.Interfaces;
 
-public interface IReportRepository
+public partial interface IReportRepository
 {
     
 }

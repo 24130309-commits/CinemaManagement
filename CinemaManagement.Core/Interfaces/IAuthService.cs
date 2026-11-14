@@ -1,6 +1,6 @@
 ﻿namespace CinemaManagement.Core.Interfaces;
 
-public interface IAuthService
+public partial interface IAuthService
 {
     
 }
