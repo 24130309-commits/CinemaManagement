@@ -1,6 +1,14 @@
-﻿namespace CinemaManagement.Core.Interfaces;
+﻿using System.Collections.Generic;
+using CinemaManagement.Core.Entities;
 
-public interface IRoomService
+namespace CinemaManagement.Core.Interfaces
 {
-    
+    public interface IRoomService
+    {
+        IEnumerable<Room> GetAllRooms();
+        Room GetRoomById(int id);
+        void AddRoom(Room room);
+        void UpdateRoom(Room room);
+        void DeleteRoom(int id);
+    }
 }

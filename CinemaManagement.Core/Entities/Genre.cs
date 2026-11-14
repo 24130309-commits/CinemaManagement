@@ -1,6 +1,9 @@
-﻿namespace CinemaManagement.Core.Entities;
-
-public class Genre
+﻿namespace CinemaManagement.Core.Entities
 {
-    
+    public class Genre
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+    }
 }
+    
