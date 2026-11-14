@@ -1,6 +1,9 @@
 ﻿namespace CinemaManagement.Core.Enums;
 
-public class PaymentMethod
+public enum PaymentMethod
 {
-    
+    Cash,
+    CreditCard,
+    MOMO,
+    VNPay
 }
