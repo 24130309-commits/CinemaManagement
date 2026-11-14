@@ -1,6 +1,10 @@
-﻿namespace CinemaManagement.Core.Interfaces;
+﻿using CinemaManagement.Core.Entities;
 
-public interface IPromotionRepository
+namespace CinemaManagement.Core.Interfaces
 {
-    
+    public interface IPromotionRepository : IRepository<Promotion>
+    {
+        Promotion GetByCode(string code);
+        bool IsCodeExists(string code, int? excludeId = null);
+    }
 }

@@ -1,6 +1,9 @@
-﻿namespace CinemaManagement.Core.Interfaces;
+﻿using CinemaManagement.Core.Entities;
 
-public interface IGenreRepository
+namespace CinemaManagement.Core.Interfaces
 {
-    
+    public interface IGenreRepository : IRepository<Genre>
+    {
+        bool IsNameExists(string name, int? excludeId = null);
+    }
 }
