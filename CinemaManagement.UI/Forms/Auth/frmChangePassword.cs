@@ -1,4 +1,5 @@
 ﻿
+﻿
 using CinemaManagement.BLL.Session;
 using CinemaManagement.Core.Interfaces;
 using CinemaManagement.UI.Helpers;
@@ -10,7 +11,10 @@ public partial class frmChangePassword : Form
     private readonly IAuthService _auth;
     private readonly CurrentUserSession _session;
     private readonly IAuditService _audit;
-    private readonly TextBox _old = new(), _next = new(), _confirm = new();
+
+    private readonly TextBox _old = new();
+    private readonly TextBox _next = new();
+    private readonly TextBox _confirm = new();
 
     public frmChangePassword(
         IAuthService auth,
@@ -23,9 +27,32 @@ public partial class frmChangePassword : Form
 
         InitializeComponent();
 
-        BuildField("Mật khẩu hiện tại", _old, 70);
-        BuildField("Mật khẩu mới", _next, 145);
-        BuildField("Xác nhận mật khẩu mới", _confirm, 220);
+        Text = "Bảo mật tài khoản";
+        MinimumSize = new Size(560, 470);
+        Size = new Size(560, 470);
+        BackColor = ThemeHelper.Background;
+
+        Controls.Add(new Label
+        {
+            Text = "ĐỔI MẬT KHẨU",
+            Location = new Point(35, 22),
+            Size = new Size(450, 32),
+            Font = ThemeHelper.HeadingFont,
+            ForeColor = ThemeHelper.Primary
+        });
+
+        Controls.Add(new Label
+        {
+            Text = "Sử dụng mật khẩu mạnh để bảo vệ tài khoản của bạn.",
+            Location = new Point(37, 52),
+            Size = new Size(450, 22),
+            Font = ThemeHelper.SmallFont,
+            ForeColor = ThemeHelper.Muted
+        });
+
+        BuildField("Mật khẩu hiện tại", _old, 95);
+        BuildField("Mật khẩu mới", _next, 170);
+        BuildField("Xác nhận mật khẩu mới", _confirm, 245);
 
         _old.UseSystemPasswordChar =
             _next.UseSystemPasswordChar =
@@ -34,24 +61,30 @@ public partial class frmChangePassword : Form
         var save = new Button
         {
             Text = "Lưu thay đổi",
-            Location = new Point(270, 310),
+            Location = new Point(300, 345),
             Size = new Size(130, 38)
         };
+
         save.Click += Save_Click;
 
         var cancel = new Button
         {
             Text = "Hủy",
-            Location = new Point(410, 310),
+            Location = new Point(440, 345),
             Size = new Size(75, 38)
         };
+
         cancel.Click += (_, _) => Close();
 
         Controls.AddRange([save, cancel]);
+
         ThemeHelper.Apply(this);
     }
 
-    private void BuildField(string caption, TextBox box, int top)
+    private void BuildField(
+        string caption,
+        TextBox box,
+        int top)
     {
         var label = new Label
         {
@@ -61,6 +94,7 @@ public partial class frmChangePassword : Form
         };
 
         box.SetBounds(35, top + 25, 450, 32);
+
         Controls.AddRange([label, box]);
     }
 
@@ -70,14 +104,18 @@ public partial class frmChangePassword : Form
         {
             if (_session.User is null)
             {
-                MessageHelper.Warning("Phiên đăng nhập đã hết hạn.");
+                MessageHelper.Warning(
+                    "Phiên đăng nhập đã hết hạn.");
+
                 Close();
                 return;
             }
 
             if (_next.Text != _confirm.Text)
             {
-                MessageHelper.Warning("Mật khẩu xác nhận không khớp.");
+                MessageHelper.Warning(
+                    "Mật khẩu xác nhận không khớp.");
+
                 return;
             }
 
@@ -86,7 +124,9 @@ public partial class frmChangePassword : Form
                     _old.Text,
                     _next.Text))
             {
-                MessageHelper.Warning("Mật khẩu hiện tại không chính xác.");
+                MessageHelper.Warning(
+                    "Mật khẩu hiện tại không chính xác.");
+
                 return;
             }
 
@@ -94,7 +134,9 @@ public partial class frmChangePassword : Form
                 "CHANGE_PASSWORD",
                 "Người dùng đổi mật khẩu.");
 
-            MessageHelper.Info("Đổi mật khẩu thành công.");
+            MessageHelper.Info(
+                "Đổi mật khẩu thành công.");
+
             Close();
         }
         catch (Exception ex)

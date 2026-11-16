@@ -1,5 +1,5 @@
-﻿using Dapper;
-using BCrypt.Net;
+﻿
+using Dapper;
 using CinemaManagement.Core.Constants;
 using CinemaManagement.Core.Enums;
 
@@ -9,7 +9,15 @@ public sealed class DbSeeder
 {
     private readonly SqliteConnectionFactory _factory;
 
-    public DbSeeder(SqliteConnectionFactory factory) => _factory = factory;
+    public DbSeeder(SqliteConnectionFactory factory)
+    {
+        _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+    }
+
+    public void Seed()
+    {
+        SeedIfEmpty();
+    }
 
     public void SeedIfEmpty()
     {
@@ -22,13 +30,14 @@ public sealed class DbSeeder
         {
             connection.Execute(
                 @"INSERT INTO Users
-                  (Username, PasswordHash, FullName, Role, IsActive)
+                    (Username, PasswordHash, FullName, Role, IsActive)
                   VALUES
-                  (@Username, @PasswordHash, @FullName, @Role, 1)",
+                    (@Username, @PasswordHash, @FullName, @Role, 1)",
                 new
                 {
                     Username = AppConstants.DefaultAdminUsername,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(AppConstants.DefaultAdminPassword),
+                    PasswordHash = global::BCrypt.Net.BCrypt.HashPassword(
+                        AppConstants.DefaultAdminPassword),
                     FullName = "Quản trị viên",
                     Role = (int)UserRole.Admin
                 },
@@ -64,7 +73,8 @@ public sealed class DbSeeder
                 transaction: transaction) == 0)
         {
             connection.Execute(
-                "INSERT INTO Genres(Name) VALUES ('Hành động'), ('Tâm lý'), ('Hoạt hình')",
+                "INSERT INTO Genres(Name) VALUES " +
+                "('Hành động'), ('Tâm lý'), ('Hoạt hình')",
                 transaction: transaction);
         }
 
@@ -74,12 +84,12 @@ public sealed class DbSeeder
         {
             connection.Execute(
                 @"INSERT INTO Movies
-                  (Title, DurationMinutes, Description, PosterPath, TrailerUrl,
-                   AgeLimit, ReleaseDate, Status)
+                    (Title, DurationMinutes, Description, PosterPath,
+                     TrailerUrl, AgeLimit, ReleaseDate, Status)
                   VALUES
-                  ('Đêm chiếu đầu tiên', 125,
-                   'Phim mẫu để kiểm tra hệ thống quản lý rạp.',
-                   '', '', 13, @ReleaseDate, @Status)",
+                    ('Đêm chiếu đầu tiên', 125,
+                     'Phim mẫu để kiểm tra hệ thống quản lý rạp.',
+                     '', '', 13, @ReleaseDate, @Status)",
                 new
                 {
                     ReleaseDate = DateTime.Today.ToString("yyyy-MM-dd"),
@@ -96,7 +106,8 @@ public sealed class DbSeeder
                 transaction: transaction);
 
             connection.Execute(
-                "INSERT OR IGNORE INTO MovieGenres(MovieId, GenreId) VALUES (@movieId, @genreId)",
+                @"INSERT OR IGNORE INTO MovieGenres(MovieId, GenreId)
+                  VALUES (@movieId, @genreId)",
                 new { movieId, genreId },
                 transaction);
         }
@@ -107,8 +118,9 @@ public sealed class DbSeeder
         {
             connection.Execute(
                 @"INSERT INTO Rooms
-                  (Name, TotalRows, TotalCols, ScreenType, IsActive)
-                  VALUES ('Phòng 1', 6, 8, @ScreenType, 1)",
+                    (Name, TotalRows, TotalCols, ScreenType, IsActive)
+                  VALUES
+                    ('Phòng 1', 6, 8, @ScreenType, 1)",
                 new { ScreenType = (int)ScreenType.TwoD },
                 transaction);
 
@@ -124,8 +136,9 @@ public sealed class DbSeeder
                 {
                     connection.Execute(
                         @"INSERT INTO Seats
-                          (RoomId, RowLabel, ColNumber, SeatType)
-                          VALUES (@roomId, @rowLabel, @col, @seatType)",
+                            (RoomId, RowLabel, ColNumber, SeatType)
+                          VALUES
+                            (@roomId, @rowLabel, @col, @seatType)",
                         new
                         {
                             roomId,
@@ -157,13 +170,14 @@ public sealed class DbSeeder
                 transaction: transaction);
 
             var start = DateTime.Today.AddDays(1).AddHours(18);
-            var end = start.AddMinutes(125 + AppConstants.DefaultCleaningMinutes);
+            var end = start.AddMinutes(
+                125 + AppConstants.DefaultCleaningMinutes);
 
             connection.Execute(
                 @"INSERT INTO Showtimes
-                  (MovieId, RoomId, StartTime, EndTime, BasePrice, IsActive)
+                    (MovieId, RoomId, StartTime, EndTime, BasePrice, IsActive)
                   VALUES
-                  (@movieId, @roomId, @start, @end, @price, 1)",
+                    (@movieId, @roomId, @start, @end, @price, 1)",
                 new
                 {
                     movieId,
@@ -182,9 +196,9 @@ public sealed class DbSeeder
             connection.Execute(
                 @"INSERT INTO Products(Name, Price, Category, IsActive)
                   VALUES
-                  ('Bắp rang bơ', 45000, 'Bắp', 1),
-                  ('Nước suối', 20000, 'Nước', 1),
-                  ('Combo bắp + nước', 60000, 'Combo', 1)",
+                    ('Bắp rang bơ', 45000, 'Bắp', 1),
+                    ('Nước suối', 20000, 'Nước', 1),
+                    ('Combo bắp + nước', 60000, 'Combo', 1)",
                 transaction: transaction);
         }
 

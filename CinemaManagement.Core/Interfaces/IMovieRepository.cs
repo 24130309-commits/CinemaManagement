@@ -1,6 +1,10 @@
-﻿namespace CinemaManagement.Core.Interfaces;
+﻿using CinemaManagement.Core.Entities;
+using CinemaManagement.Core.Enums;
 
-public interface IMovieRepository
+namespace CinemaManagement.Core.Interfaces;
+
+public interface IMovieRepository : IRepository<Movie>
 {
-    
+    IEnumerable<Movie> GetMoviesByStatus(MovieStatus status);
+    bool IsTitleExists(string title, int? excludeId = null);
 }

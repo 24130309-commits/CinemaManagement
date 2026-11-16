@@ -1,6 +1,10 @@
-﻿namespace CinemaManagement.Core.Interfaces;
+﻿using CinemaManagement.Core.Entities;
 
-public interface IRoomRepository
+namespace CinemaManagement.Core.Interfaces;
+
+public interface IRoomRepository : IRepository<Room>
 {
-    
+    bool IsRoomNameExists(string name, int? excludeId = null);
+
+    int Add(Room room) => Insert(room);
 }
