@@ -59,7 +59,7 @@ public class TicketRepository : ITicketRepository
             SELECT COUNT(1) 
             FROM Tickets t
             INNER JOIN Bookings b ON t.BookingId = b.Id
-            WHERE t.ShowTimeId = @ShowTimeId AND t.SeatId = @SeatId AND b.Status != 'Cancelled'";
+            WHERE t.ShowTimeId = @ShowTimeId AND t.SeatId = @SeatId AND b.Status != 'Canceled'";
         cmd.Parameters.AddWithValue("@ShowTimeId", showtimeId);
         cmd.Parameters.AddWithValue("@SeatId", seatId);
 
