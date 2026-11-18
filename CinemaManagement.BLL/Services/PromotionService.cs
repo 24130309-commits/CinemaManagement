@@ -27,12 +27,11 @@ namespace CinemaManagement.BLL.Services
             if (string.IsNullOrWhiteSpace(code))
                 throw new BusinessException("Vui lòng nhập mã khuyến mãi.");
 
-            var promotion =
-                _promotionRepository.GetByCode(code.Trim().ToUpperInvariant());
+            var promotion = _promotionRepository.GetByCode(
+                code.Trim().ToUpperInvariant());
 
             if (promotion == null)
-                throw new BusinessException(
-                    "Mã khuyến mãi không tồn tại.");
+                throw new BusinessException("Mã khuyến mãi không tồn tại.");
 
             var now = DateTime.Now;
 
@@ -42,14 +41,57 @@ namespace CinemaManagement.BLL.Services
 
             if (promotion.UsageLimit > 0 &&
                 promotion.UsedCount >= promotion.UsageLimit)
+            {
                 throw new BusinessException(
                     "Mã khuyến mãi đã hết lượt sử dụng.");
+            }
 
             if (promotion.Value <= 0)
-                throw new BusinessException(
-                    "Giá trị khuyến mãi không hợp lệ.");
+                throw new BusinessException("Giá trị khuyến mãi không hợp lệ.");
 
             return promotion;
+        }
+
+        public Promotion Validate(string code, decimal orderTotal)
+        {
+            if (orderTotal < 0)
+                throw new BusinessException("Giá trị đơn hàng không hợp lệ.");
+
+            var promotion = ValidateAndGetPromotion(code);
+
+            if (orderTotal < promotion.MinOrder)
+                throw new BusinessException(
+                    "Đơn hàng chưa đạt giá trị tối thiểu để sử dụng mã.");
+
+            return promotion;
+        }
+
+        public decimal ApplyDiscount(string code, decimal orderTotal)
+        {
+            var promotion = Validate(code, orderTotal);
+
+            decimal discount;
+
+            if (string.Equals(
+                promotion.Type,
+                "Percent",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                discount = orderTotal * promotion.Value / 100m;
+            }
+            else if (string.Equals(
+                promotion.Type,
+                "Fixed",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                discount = promotion.Value;
+            }
+            else
+            {
+                throw new BusinessException("Loại khuyến mãi không hợp lệ.");
+            }
+
+            return Math.Min(orderTotal, discount);
         }
 
         public void AddPromotion(Promotion promotion)
@@ -59,8 +101,7 @@ namespace CinemaManagement.BLL.Services
             promotion.Code = promotion.Code.Trim().ToUpperInvariant();
 
             if (_promotionRepository.IsCodeExists(promotion.Code))
-                throw new BusinessException(
-                    "Mã khuyến mãi này đã tồn tại.");
+                throw new BusinessException("Mã khuyến mãi này đã tồn tại.");
 
             if (_promotionRepository.Insert(promotion) <= 0)
                 throw new BusinessException(
@@ -72,16 +113,17 @@ namespace CinemaManagement.BLL.Services
             ValidatePromotionData(promotion);
 
             if (promotion.Id <= 0)
-                throw new BusinessException(
-                    "Mã khuyến mãi không hợp lệ.");
+                throw new BusinessException("Mã khuyến mãi không hợp lệ.");
 
             promotion.Code = promotion.Code.Trim().ToUpperInvariant();
 
             if (_promotionRepository.IsCodeExists(
                 promotion.Code,
                 promotion.Id))
+            {
                 throw new BusinessException(
                     "Mã khuyến mãi bị trùng với chương trình khác.");
+            }
 
             if (!_promotionRepository.Update(promotion))
                 throw new BusinessException(
@@ -91,8 +133,7 @@ namespace CinemaManagement.BLL.Services
         public void DeletePromotion(int id)
         {
             if (id <= 0)
-                throw new BusinessException(
-                    "Mã khuyến mãi không hợp lệ.");
+                throw new BusinessException("Mã khuyến mãi không hợp lệ.");
 
             if (!_promotionRepository.Delete(id))
                 throw new BusinessException(
@@ -102,16 +143,13 @@ namespace CinemaManagement.BLL.Services
         private static void ValidatePromotionData(Promotion promotion)
         {
             if (promotion == null)
-                throw new BusinessException(
-                    "Dữ liệu khuyến mãi không hợp lệ.");
+                throw new BusinessException("Dữ liệu khuyến mãi không hợp lệ.");
 
             if (string.IsNullOrWhiteSpace(promotion.Code))
-                throw new BusinessException(
-                    "Mã khuyến mãi không được để trống.");
+                throw new BusinessException("Mã khuyến mãi không được để trống.");
 
             if (string.IsNullOrWhiteSpace(promotion.Type))
-                throw new BusinessException(
-                    "Vui lòng chọn loại khuyến mãi.");
+                throw new BusinessException("Vui lòng chọn loại khuyến mãi.");
 
             if (promotion.Value <= 0)
                 throw new BusinessException(
@@ -120,10 +158,24 @@ namespace CinemaManagement.BLL.Services
             if (string.Equals(
                 promotion.Type,
                 "Percent",
-                StringComparison.OrdinalIgnoreCase) &&
-                promotion.Value > 100)
+                StringComparison.OrdinalIgnoreCase)
+                && promotion.Value > 100)
+            {
                 throw new BusinessException(
                     "Phần trăm giảm giá không được vượt quá 100%.");
+            }
+
+            if (!string.Equals(
+                    promotion.Type,
+                    "Percent",
+                    StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(
+                    promotion.Type,
+                    "Fixed",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new BusinessException("Loại khuyến mãi không hợp lệ.");
+            }
 
             if (promotion.MinOrder < 0)
                 throw new BusinessException(

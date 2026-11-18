@@ -11,7 +11,8 @@ public sealed class SettingRepository : ISettingRepository
 
     public SettingRepository(SqliteConnectionFactory factory)
     {
-        _factory = factory;
+        _factory = factory
+                   ?? throw new ArgumentNullException(nameof(factory));
     }
 
     public string Get(string key)
@@ -19,10 +20,19 @@ public sealed class SettingRepository : ISettingRepository
         using var connection = _factory.CreateConnection();
 
         return connection.QuerySingleOrDefault<string>(
-            @"SELECT Value
+            "SELECT [Value] FROM Settings WHERE [Key] = @key",
+            new { key }) ?? string.Empty;
+    }
+
+    public AppSetting? GetByKey(string key)
+    {
+        using var connection = _factory.CreateConnection();
+
+        return connection.QuerySingleOrDefault<AppSetting>(
+            @"SELECT [Key], [Value]
               FROM Settings
               WHERE [Key] = @key",
-            new { key }) ?? string.Empty;
+            new { key });
     }
 
     public void Set(string key, string value)
@@ -33,8 +43,15 @@ public sealed class SettingRepository : ISettingRepository
             @"INSERT INTO Settings([Key], [Value])
               VALUES (@key, @value)
               ON CONFLICT([Key])
-              DO UPDATE SET Value = excluded.Value",
+              DO UPDATE SET [Value] = excluded.[Value]",
             new { key, value });
+    }
+
+    public void Upsert(AppSetting setting)
+    {
+        ArgumentNullException.ThrowIfNull(setting);
+
+        Set(setting.Key, setting.Value);
     }
 
     public IEnumerable<AppSetting> GetAll()

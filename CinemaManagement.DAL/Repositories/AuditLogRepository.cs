@@ -1,4 +1,5 @@
-﻿using Dapper;
+﻿
+using Dapper;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Interfaces;
 using CinemaManagement.DAL.Database;
@@ -15,14 +16,39 @@ public sealed class AuditLogRepository
 
     public void Add(AuditLog log)
     {
+        ArgumentNullException.ThrowIfNull(log);
+
         using var connection = ConnectionFactory.CreateConnection();
 
         connection.Execute(
-            @"INSERT INTO AuditLogs
-              (UserId, Action, Detail, CreatedAt)
-              VALUES
-              (@UserId, @Action, @Detail, @CreatedAt)",
-            log);
+            @"INSERT INTO AuditLogs(UserId, Action, Detail, CreatedAt)
+              VALUES (@UserId, @Action, @Detail, @CreatedAt)",
+            new
+            {
+                log.UserId,
+                log.Action,
+                log.Detail,
+                CreatedAt = log.CreatedAt.ToString("O")
+            });
+    }
+
+    public override int Insert(AuditLog log)
+    {
+        ArgumentNullException.ThrowIfNull(log);
+
+        using var connection = ConnectionFactory.CreateConnection();
+
+        return connection.ExecuteScalar<int>(
+            @"INSERT INTO AuditLogs(UserId, Action, Detail, CreatedAt)
+              VALUES (@UserId, @Action, @Detail, @CreatedAt);
+              SELECT last_insert_rowid();",
+            new
+            {
+                log.UserId,
+                log.Action,
+                log.Detail,
+                CreatedAt = log.CreatedAt.ToString("O")
+            });
     }
 
     public IEnumerable<AuditLog> Search(
@@ -36,40 +62,29 @@ public sealed class AuditLogRepository
             @"SELECT Id, UserId, Action, Detail, CreatedAt
               FROM AuditLogs
               WHERE (@userId = 0 OR UserId = @userId)
-                AND CreatedAt >= @from
-                AND CreatedAt <= @to
+                AND datetime(CreatedAt) >= datetime(@from)
+                AND datetime(CreatedAt) < datetime(@to)
               ORDER BY CreatedAt DESC",
             new
             {
                 userId,
                 from = from.ToString("O"),
-                to = to.ToString("O")
+                to = to.Date.AddDays(1).ToString("O")
             }).AsList();
     }
 
-    public override int Insert(AuditLog log)
+    public IEnumerable<AuditLog> GetRecentLogs(int limit = 100)
     {
+        if (limit < 1)
+            throw new ArgumentOutOfRangeException(nameof(limit));
+
         using var connection = ConnectionFactory.CreateConnection();
 
-        return connection.ExecuteScalar<int>(
-            @"INSERT INTO AuditLogs
-              (UserId, Action, Detail, CreatedAt)
-              VALUES
-              (@UserId, @Action, @Detail, @CreatedAt);
-
-              SELECT last_insert_rowid();",
-            log);
-    }
-
-    public override bool Update(AuditLog log)
-    {
-        throw new NotSupportedException(
-            "Nhật ký hoạt động không hỗ trợ chỉnh sửa.");
-    }
-
-    public override bool Delete(int id)
-    {
-        throw new NotSupportedException(
-            "Nhật ký hoạt động không hỗ trợ xóa trực tiếp.");
+        return connection.Query<AuditLog>(
+            @"SELECT Id, UserId, Action, Detail, CreatedAt
+              FROM AuditLogs
+              ORDER BY Id DESC
+              LIMIT @limit",
+            new { limit }).AsList();
     }
 }

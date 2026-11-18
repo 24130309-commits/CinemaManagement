@@ -1,6 +1,10 @@
-﻿namespace CinemaManagement.Core.Interfaces;
+﻿using CinemaManagement.Core.Entities;
 
-public interface IProductRepository
+namespace CinemaManagement.Core.Interfaces;
+
+public interface IProductRepository : IRepository<Product>
 {
-    
+    IEnumerable<Product> GetActive();
+
+    IEnumerable<Product> GetByCategory(string category);
 }

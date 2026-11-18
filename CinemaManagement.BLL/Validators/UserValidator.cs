@@ -30,7 +30,8 @@ public sealed class UserValidator
             user.FullName.Trim().Length < 2 ||
             user.FullName.Length > 100)
         {
-            throw new BusinessException("Họ tên phải có từ 2 đến 100 ký tự.");
+            throw new BusinessException(
+                "Họ tên phải có từ 2 đến 100 ký tự.");
         }
 
         if (validatePassword)

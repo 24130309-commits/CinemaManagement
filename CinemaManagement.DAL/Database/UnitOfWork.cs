@@ -8,28 +8,35 @@ public sealed class UnitOfWork : IDisposable
     private SqliteTransaction? _transaction;
     private bool _completed;
 
+    public SqliteConnection Connection => _connection;
+
+    public SqliteTransaction? Transaction => _transaction;
+
     public UnitOfWork(SqliteConnectionFactory factory)
     {
         _connection = factory.CreateConnection();
     }
 
-    public SqliteConnection Connection => _connection;
-
-    public SqliteTransaction? Transaction => _transaction;
-
     public void Begin()
     {
         if (_transaction != null)
-            throw new InvalidOperationException("Transaction đã được mở.");
+            throw new InvalidOperationException(
+                "Transaction đã được mở.");
 
         _transaction = _connection.BeginTransaction();
         _completed = false;
     }
 
+    public void BeginTransaction()
+    {
+        Begin();
+    }
+
     public void Commit()
     {
         if (_transaction == null)
-            throw new InvalidOperationException("Chưa mở transaction.");
+            throw new InvalidOperationException(
+                "Chưa mở transaction.");
 
         _transaction.Commit();
         _completed = true;

@@ -40,6 +40,45 @@ public class MovieRepository : BaseRepository<Movie>, IMovieRepository
             new { Status = (int)status }).AsList();
     }
 
+    // Tìm kiếm phim theo từ khóa, thể loại và trạng thái.
+    public IEnumerable<Movie> Search(
+        string keyword,
+        int? genreId = null,
+        MovieStatus? status = null)
+    {
+        using var connection = ConnectionFactory.CreateConnection();
+
+        return connection.Query<Movie>(
+            """
+            SELECT DISTINCT m.*
+            FROM Movies m
+            LEFT JOIN MovieGenres mg ON mg.MovieId = m.Id
+            WHERE
+                (
+                    @Keyword = ''
+                    OR m.Title LIKE @SearchKeyword
+                )
+                AND
+                (
+                    @GenreId IS NULL
+                    OR mg.GenreId = @GenreId
+                )
+                AND
+                (
+                    @Status IS NULL
+                    OR m.Status = @Status
+                )
+            ORDER BY m.Id DESC;
+            """,
+            new
+            {
+                Keyword = (keyword ?? string.Empty).Trim(),
+                SearchKeyword = $"%{(keyword ?? string.Empty).Trim()}%",
+                GenreId = genreId,
+                Status = status.HasValue ? (int?)status.Value : null
+            }).AsList();
+    }
+
     public bool IsTitleExists(string title, int? excludeId = null)
     {
         if (string.IsNullOrWhiteSpace(title))
@@ -62,6 +101,73 @@ public class MovieRepository : BaseRepository<Movie>, IMovieRepository
                 Title = title.Trim(),
                 ExcludeId = excludeId
             });
+    }
+
+    // Lấy danh sách mã thể loại của một phim.
+    public IEnumerable<int> GetGenreIds(int movieId)
+    {
+        using var connection = ConnectionFactory.CreateConnection();
+
+        return connection.Query<int>(
+            """
+            SELECT GenreId
+            FROM MovieGenres
+            WHERE MovieId = @MovieId
+            ORDER BY GenreId;
+            """,
+            new { MovieId = movieId }).AsList();
+    }
+
+    // Cập nhật danh sách thể loại của một phim.
+    public void SetGenres(int movieId, IEnumerable<int> genreIds)
+    {
+        ArgumentNullException.ThrowIfNull(genreIds);
+
+        if (movieId <= 0)
+            throw new ArgumentException("Mã phim không hợp lệ.", nameof(movieId));
+
+        var ids = genreIds.Distinct().ToList();
+
+        if (ids.Any(id => id <= 0))
+            throw new ArgumentException("Mã thể loại không hợp lệ.", nameof(genreIds));
+
+        using var connection = ConnectionFactory.CreateConnection();
+        using var transaction = connection.BeginTransaction();
+
+        try
+        {
+            // Xóa các thể loại cũ của phim.
+            connection.Execute(
+                """
+                DELETE FROM MovieGenres
+                WHERE MovieId = @MovieId;
+                """,
+                new { MovieId = movieId },
+                transaction);
+
+            // Thêm danh sách thể loại mới.
+            foreach (var genreId in ids)
+            {
+                connection.Execute(
+                    """
+                    INSERT INTO MovieGenres (MovieId, GenreId)
+                    VALUES (@MovieId, @GenreId);
+                    """,
+                    new
+                    {
+                        MovieId = movieId,
+                        GenreId = genreId
+                    },
+                    transaction);
+            }
+
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
     }
 
     public override int Insert(Movie entity)
