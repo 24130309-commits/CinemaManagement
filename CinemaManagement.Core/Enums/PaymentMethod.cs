@@ -5,9 +5,8 @@ public enum PaymentMethod
     Cash = 0,
     Card = 1,
     EWallet = 2,
+    MOMO = 3,
+    VNPay = 4,
 
-    // Tương thích tên phương thức cũ.
-    CreditCard = Card,
-    MOMO = EWallet,
-    VNPay = EWallet
+    CreditCard = Card
 }

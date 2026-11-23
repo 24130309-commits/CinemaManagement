@@ -1,17 +1,21 @@
-﻿using CinemaManagement.Core.Enums;
+using CinemaManagement.Core.Enums;
 
 namespace CinemaManagement.Core.Entities;
 
 public class Room
 {
     public int Id { get; set; }
+
     public string Name { get; set; } = string.Empty;
+
     public int TotalRows { get; set; }
+
     public int TotalCols { get; set; }
+
     public ScreenType ScreenType { get; set; }
+
     public bool IsActive { get; set; } = true;
 
-    // Tương thích code cũ của B.
     public int SeatsPerRow
     {
         get => TotalCols;

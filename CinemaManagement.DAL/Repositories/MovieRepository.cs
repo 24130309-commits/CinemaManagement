@@ -1,4 +1,4 @@
-﻿
+
 using Dapper;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Enums;
@@ -40,7 +40,6 @@ public class MovieRepository : BaseRepository<Movie>, IMovieRepository
             new { Status = (int)status }).AsList();
     }
 
-    // Tìm kiếm phim theo từ khóa, thể loại và trạng thái.
     public IEnumerable<Movie> Search(
         string keyword,
         int? genreId = null,
@@ -103,7 +102,6 @@ public class MovieRepository : BaseRepository<Movie>, IMovieRepository
             });
     }
 
-    // Lấy danh sách mã thể loại của một phim.
     public IEnumerable<int> GetGenreIds(int movieId)
     {
         using var connection = ConnectionFactory.CreateConnection();
@@ -118,7 +116,6 @@ public class MovieRepository : BaseRepository<Movie>, IMovieRepository
             new { MovieId = movieId }).AsList();
     }
 
-    // Cập nhật danh sách thể loại của một phim.
     public void SetGenres(int movieId, IEnumerable<int> genreIds)
     {
         ArgumentNullException.ThrowIfNull(genreIds);
@@ -136,7 +133,6 @@ public class MovieRepository : BaseRepository<Movie>, IMovieRepository
 
         try
         {
-            // Xóa các thể loại cũ của phim.
             connection.Execute(
                 """
                 DELETE FROM MovieGenres
@@ -145,7 +141,6 @@ public class MovieRepository : BaseRepository<Movie>, IMovieRepository
                 new { MovieId = movieId },
                 transaction);
 
-            // Thêm danh sách thể loại mới.
             foreach (var genreId in ids)
             {
                 connection.Execute(
@@ -216,7 +211,6 @@ public class MovieRepository : BaseRepository<Movie>, IMovieRepository
             });
     }
 
-    // Giữ tên Add để tương thích với code cũ của B.
     public int Add(Movie entity)
     {
         return Insert(entity);

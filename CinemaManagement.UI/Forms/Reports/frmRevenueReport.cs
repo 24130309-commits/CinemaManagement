@@ -1,4 +1,9 @@
-﻿﻿
+
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
 using CinemaManagement.Core.DTOs;
 using CinemaManagement.Core.Interfaces;
 using CinemaManagement.UI.Helpers;
@@ -14,13 +19,15 @@ public partial class frmRevenueReport : Form
     private readonly DateTimePicker _from = new()
     {
         Value = DateTime.Today.AddDays(-30),
-        Width = 150
+        Width = 150,
+        Format = DateTimePickerFormat.Short
     };
 
     private readonly DateTimePicker _to = new()
     {
         Value = DateTime.Today,
-        Width = 150
+        Width = 150,
+        Format = DateTimePickerFormat.Short
     };
 
     private readonly DataGridView _grid = new()
@@ -29,7 +36,20 @@ public partial class frmRevenueReport : Form
         ReadOnly = true,
         AutoGenerateColumns = true,
         AllowUserToAddRows = false,
+        AllowUserToDeleteRows = false,
+        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+    };
+
+    private readonly Label _summary = new()
+    {
+        Dock = DockStyle.Bottom,
+        Height = 48,
+        Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+        ForeColor = ThemeHelper.Primary,
+        TextAlign = ContentAlignment.MiddleLeft,
+        Padding = new Padding(16, 0, 0, 0),
+        BackColor = ThemeHelper.Surface
     };
 
     private List<RevenueByMovieDto> _data = [];
@@ -39,87 +59,113 @@ public partial class frmRevenueReport : Form
         IExportService export,
         IAuditService audit)
     {
-        _reports = reports;
-        _export = export;
-        _audit = audit;
+        _reports = reports ?? throw new ArgumentNullException(nameof(reports));
+        _export = export ?? throw new ArgumentNullException(nameof(export));
+        _audit = audit ?? throw new ArgumentNullException(nameof(audit));
 
         InitializeComponent();
 
         Text = "Báo cáo doanh thu";
+        StartPosition = FormStartPosition.CenterParent;
+        MinimumSize = new Size(950, 580);
         Size = new Size(1100, 680);
+        BackColor = ThemeHelper.Background;
 
-        var bar = new FlowLayoutPanel
+        BuildLayout();
+
+        Load += (_, _) => LoadData();
+
+        ThemeHelper.Apply(this);
+    }
+
+    private void BuildLayout()
+    {
+        var heading = new Panel
         {
             Dock = DockStyle.Top,
             Height = 76,
-            Padding = new Padding(14, 8, 8, 8),
+            Padding = new Padding(18, 12, 12, 8),
+            BackColor = ThemeHelper.Surface
+        };
+
+        heading.Controls.Add(new Label
+        {
+            Text = "BÁO CÁO DOANH THU",
+            Dock = DockStyle.Top,
+            Height = 36,
+            Font = ThemeHelper.HeadingFont,
+            ForeColor = ThemeHelper.Primary
+        });
+
+        var toolbar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 66,
+            Padding = new Padding(14, 12, 8, 8),
             WrapContents = false,
             BackColor = ThemeHelper.Surface
         };
 
-        bar.Controls.Add(new Label
-        {
-            Text = "BÁO CÁO DOANH THU",
-            AutoSize = true,
-            Font = ThemeHelper.SectionFont,
-            ForeColor = ThemeHelper.Primary,
-            Padding = new Padding(0, 8, 16, 0)
-        });
-
-        bar.Controls.Add(new Label
+        toolbar.Controls.Add(new Label
         {
             Text = "Từ ngày",
             AutoSize = true,
             Padding = new Padding(0, 8, 0, 0)
         });
 
-        bar.Controls.Add(_from);
+        toolbar.Controls.Add(_from);
 
-        bar.Controls.Add(new Label
+        toolbar.Controls.Add(new Label
         {
             Text = "Đến ngày",
             AutoSize = true,
             Padding = new Padding(0, 8, 0, 0)
         });
 
-        bar.Controls.Add(_to);
+        toolbar.Controls.Add(_to);
 
         var load = new Button
         {
             Text = "Xem báo cáo",
-            AutoSize = true
+            AutoSize = true,
+            Height = 34
         };
 
         load.Click += (_, _) => LoadData();
 
-        bar.Controls.Add(load);
-
-        var excel = new Button
+        var export = new Button
         {
-            Text = "Xuất Excel",
-            AutoSize = true
+            Text = "Xuất CSV",
+            AutoSize = true,
+            Height = 34
         };
 
-        excel.Click += (_, _) => Export(true);
+        export.Click += (_, _) => Export();
 
-        bar.Controls.Add(excel);
+        toolbar.Controls.Add(load);
+        toolbar.Controls.Add(export);
 
-        var pdf = new Button
+        var content = new Panel
         {
-            Text = "Xuất PDF",
-            AutoSize = true
+            Dock = DockStyle.Fill,
+            Padding = new Padding(14),
+            BackColor = ThemeHelper.Background
         };
 
-        pdf.Click += (_, _) => Export(false);
+        var gridPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8),
+            BackColor = ThemeHelper.Surface
+        };
 
-        bar.Controls.Add(pdf);
+        gridPanel.Controls.Add(_grid);
+        content.Controls.Add(gridPanel);
 
-        Controls.Add(_grid);
-        Controls.Add(bar);
-
-        Load += (_, _) => LoadData();
-
-        ThemeHelper.Apply(this);
+        Controls.Add(content);
+        Controls.Add(_summary);
+        Controls.Add(toolbar);
+        Controls.Add(heading);
     }
 
     private void LoadData()
@@ -136,38 +182,13 @@ public partial class frmRevenueReport : Form
 
             _data = _reports.GetRevenueByMovie(
                 _from.Value.Date,
-                _to.Value.Date).ToList();
+                _to.Value.Date.AddDays(1).AddTicks(-1)).ToList();
 
             _grid.DataSource = null;
             _grid.DataSource = _data;
 
-            SetColumn(
-                nameof(RevenueByMovieDto.MovieId),
-                "Mã phim",
-                false);
-
-            SetColumn(
-                nameof(RevenueByMovieDto.MovieTitle),
-                "Tên phim");
-
-            SetColumn(
-                nameof(RevenueByMovieDto.TicketCount),
-                "Số vé");
-
-            SetColumn(
-                nameof(RevenueByMovieDto.TicketRevenue),
-                "Doanh thu vé",
-                "N0");
-
-            SetColumn(
-                nameof(RevenueByMovieDto.ProductRevenue),
-                "Doanh thu sản phẩm",
-                "N0");
-
-            SetColumn(
-                nameof(RevenueByMovieDto.TotalRevenue),
-                "Tổng doanh thu",
-                "N0");
+            ConfigureColumns();
+            UpdateSummary();
         }
         catch (Exception ex)
         {
@@ -175,9 +196,58 @@ public partial class frmRevenueReport : Form
         }
     }
 
+    private void ConfigureColumns()
+    {
+        SetColumn(
+            nameof(RevenueByMovieDto.MovieId),
+            "Mã phim",
+            false);
+
+        SetColumn(
+            nameof(RevenueByMovieDto.MovieTitle),
+            "Tên phim");
+
+        SetColumn(
+            nameof(RevenueByMovieDto.TotalShowtimes),
+            "Số suất chiếu",
+            true,
+            "N0");
+
+        SetColumn(
+            nameof(RevenueByMovieDto.TotalTicketsSold),
+            "Tổng vé bán",
+            true,
+            "N0");
+
+        SetColumn(
+            nameof(RevenueByMovieDto.TicketCount),
+            "Số vé",
+            true,
+            "N0");
+
+        SetColumn(
+            nameof(RevenueByMovieDto.TicketRevenue),
+            "Doanh thu vé",
+            true,
+            "N0");
+
+        SetColumn(
+            nameof(RevenueByMovieDto.ProductRevenue),
+            "Doanh thu sản phẩm",
+            true,
+            "N0");
+
+        SetColumn(
+            nameof(RevenueByMovieDto.TotalRevenue),
+            "Tổng doanh thu",
+            true,
+            "N0");
+    }
+
     private void SetColumn(
         string name,
         string header,
+        bool visible = true,
         string? format = null)
     {
         if (!_grid.Columns.Contains(name))
@@ -186,24 +256,34 @@ public partial class frmRevenueReport : Form
         var column = _grid.Columns[name]!;
 
         column.HeaderText = header;
+        column.Visible = visible;
 
         if (format is not null)
             column.DefaultCellStyle.Format = format;
     }
 
-    private void SetColumn(
-        string name,
-        string header,
-        bool visible)
+    private void UpdateSummary()
     {
-        if (!_grid.Columns.Contains(name))
+        if (_data.Count == 0)
+        {
+            _summary.Text = "  Không có dữ liệu trong khoảng thời gian đã chọn.";
             return;
+        }
 
-        _grid.Columns[name]!.HeaderText = header;
-        _grid.Columns[name]!.Visible = visible;
+        decimal totalTicketRevenue = _data.Sum(x => x.TicketRevenue);
+        decimal totalProductRevenue = _data.Sum(x => x.ProductRevenue);
+        decimal totalRevenue = _data.Sum(x => x.TotalRevenue);
+        int totalTickets = _data.Sum(x => x.TotalTicketsSold);
+
+        _summary.Text =
+            $"  Số phim: {_data.Count:N0}     " +
+            $"Vé bán: {totalTickets:N0}     " +
+            $"Doanh thu vé: {totalTicketRevenue:N0}     " +
+            $"Doanh thu sản phẩm: {totalProductRevenue:N0}     " +
+            $"Tổng: {totalRevenue:N0} VNĐ";
     }
 
-    private void Export(bool excel)
+    private void Export()
     {
         if (_data.Count == 0)
         {
@@ -213,11 +293,8 @@ public partial class frmRevenueReport : Form
 
         using var dialog = new SaveFileDialog
         {
-            Filter = excel
-                ? "Excel (*.xlsx)|*.xlsx"
-                : "PDF (*.pdf)|*.pdf",
-
-            FileName = $"BaoCaoDoanhThu_{DateTime.Now:yyyyMMdd}"
+            Filter = "CSV (*.csv)|*.csv",
+            FileName = $"BaoCaoDoanhThu_{DateTime.Now:yyyyMMdd}.csv"
         };
 
         if (dialog.ShowDialog() != DialogResult.OK)
@@ -225,14 +302,11 @@ public partial class frmRevenueReport : Form
 
         try
         {
-            if (excel)
-                _export.ExportToExcel(_data, dialog.FileName);
-            else
-                _export.ExportToPdf(_data, dialog.FileName);
+            _export.ExportToCsv(_data, dialog.FileName);
 
             _audit.Log(
                 "REVENUE_REPORT_EXPORT",
-                "Xuất báo cáo revenue thành công.");
+                "Xuất báo cáo doanh thu dạng CSV.");
 
             MessageHelper.Info("Xuất báo cáo thành công.");
         }

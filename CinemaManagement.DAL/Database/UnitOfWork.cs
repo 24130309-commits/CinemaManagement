@@ -1,8 +1,9 @@
-﻿using Microsoft.Data.Sqlite;
+using Microsoft.Data.Sqlite;
+using CinemaManagement.Core.Interfaces;
 
 namespace CinemaManagement.DAL.Database;
 
-public sealed class UnitOfWork : IDisposable
+public sealed class UnitOfWork : IUnitOfWork
 {
     private readonly SqliteConnection _connection;
     private SqliteTransaction? _transaction;
@@ -14,14 +15,17 @@ public sealed class UnitOfWork : IDisposable
 
     public UnitOfWork(SqliteConnectionFactory factory)
     {
+        ArgumentNullException.ThrowIfNull(factory);
         _connection = factory.CreateConnection();
     }
 
     public void Begin()
     {
         if (_transaction != null)
+        {
             throw new InvalidOperationException(
                 "Transaction đã được mở.");
+        }
 
         _transaction = _connection.BeginTransaction();
         _completed = false;
@@ -35,8 +39,10 @@ public sealed class UnitOfWork : IDisposable
     public void Commit()
     {
         if (_transaction == null)
+        {
             throw new InvalidOperationException(
                 "Chưa mở transaction.");
+        }
 
         _transaction.Commit();
         _completed = true;
@@ -47,7 +53,9 @@ public sealed class UnitOfWork : IDisposable
     public void Rollback()
     {
         if (_transaction == null)
+        {
             return;
+        }
 
         _transaction.Rollback();
         _completed = true;
@@ -65,7 +73,6 @@ public sealed class UnitOfWork : IDisposable
             }
             catch
             {
-                // Giữ nguyên lỗi gốc.
             }
         }
 

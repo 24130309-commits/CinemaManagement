@@ -31,7 +31,10 @@ public sealed class BackupService : IBackupService
                 "Tệp sao lưu phải khác tệp cơ sở dữ liệu đang sử dụng.");
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        var directory = Path.GetDirectoryName(full);
+
+        if (!string.IsNullOrWhiteSpace(directory))
+            Directory.CreateDirectory(directory);
 
         using var source = _factory.CreateConnection();
 
@@ -93,6 +96,7 @@ public sealed class BackupService : IBackupService
             }
 
             using var destination = _factory.CreateConnection();
+
             source.BackupDatabase(destination);
         }
         catch (BusinessException)
@@ -105,5 +109,15 @@ public sealed class BackupService : IBackupService
                 "Không thể khôi phục cơ sở dữ liệu: " + ex.Message,
                 ex);
         }
+    }
+
+    public void BackupDatabase(string destinationPath)
+    {
+        Backup(destinationPath);
+    }
+
+    public void RestoreDatabase(string sourcePath)
+    {
+        Restore(sourcePath);
     }
 }

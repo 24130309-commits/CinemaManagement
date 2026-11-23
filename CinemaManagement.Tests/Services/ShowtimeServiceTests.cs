@@ -1,4 +1,5 @@
-﻿using CinemaManagement.BLL.Services;
+
+using CinemaManagement.BLL.Services;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Enums;
 using CinemaManagement.Core.Exceptions;
@@ -192,8 +193,7 @@ public class ShowtimeServiceTests
 
         public IEnumerable<Showtime> GetByDate(DateTime date)
         {
-            return Items.Where(
-                x => x.StartTime.Date == date.Date);
+            return Items.Where(x => x.StartTime.Date == date.Date);
         }
 
         public bool HasConflict(
@@ -252,11 +252,9 @@ public class ShowtimeServiceTests
             return true;
         }
 
-        public IEnumerable<Movie> GetMoviesByStatus(
-            MovieStatus status)
+        public IEnumerable<Movie> GetMoviesByStatus(MovieStatus status)
         {
-            return new[] { _movie }
-                .Where(x => x.Status == status);
+            return new[] { _movie }.Where(x => x.Status == status);
         }
 
         public IEnumerable<Movie> Search(
@@ -267,9 +265,7 @@ public class ShowtimeServiceTests
             return new[] { _movie };
         }
 
-        public bool IsTitleExists(
-            string title,
-            int? excludeId = null)
+        public bool IsTitleExists(string title, int? excludeId = null)
         {
             return false;
         }
@@ -279,9 +275,7 @@ public class ShowtimeServiceTests
             return Array.Empty<int>();
         }
 
-        public void SetGenres(
-            int movieId,
-            IEnumerable<int> genreIds)
+        public void SetGenres(int movieId, IEnumerable<int> genreIds)
         {
         }
     }

@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Dapper;
 
 namespace CinemaManagement.DAL.Database;
@@ -21,8 +21,10 @@ public sealed class DbInitializer
                 x.EndsWith("Schema.sql", StringComparison.OrdinalIgnoreCase));
 
         if (resource == null)
+        {
             throw new InvalidOperationException(
                 "Không tìm thấy tài nguyên Schema.sql.");
+        }
 
         using var stream = assembly.GetManifestResourceStream(resource)
                            ?? throw new InvalidOperationException(

@@ -1,9 +1,10 @@
-﻿
+
 using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using CinemaManagement.Core.Entities;
+using CinemaManagement.Core.Enums;
 using CinemaManagement.Core.Interfaces;
 
 namespace CinemaManagement.UI.Forms.Catalog
@@ -12,11 +13,14 @@ namespace CinemaManagement.UI.Forms.Catalog
     {
         private readonly IRoomService _roomService;
 
-        private TextBox txtName;
-        private NumericUpDown numRows, numCols;
-        private CheckBox chkActive;
-        private DataGridView dgvRooms;
+        private TextBox txtName = null!;
+        private NumericUpDown numRows = null!;
+        private NumericUpDown numCols = null!;
+        private CheckBox chkActive = null!;
+        private DataGridView dgvRooms = null!;
+
         private int _selectedId;
+        private Room? _selectedRoom;
 
         public frmRoomManage(IRoomService roomService)
         {
@@ -115,47 +119,78 @@ namespace CinemaManagement.UI.Forms.Catalog
                 Size = new Size(80, 30)
             };
 
-            btnAdd.Click += (s, e) => Execute(() =>
+            btnAdd.Click += (_, _) => Execute(() =>
             {
-                _roomService.AddRoom(CreateRoom());
+                var room = CreateRoom();
+
+                _roomService.AddRoom(room);
+
                 ResetForm();
-                MessageBox.Show("Thêm phòng chiếu thành công.");
+
+                MessageBox.Show(
+                    "Thêm phòng chiếu thành công.",
+                    "Thông báo",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             });
 
-            btnUpdate.Click += (s, e) => Execute(() =>
+            btnUpdate.Click += (_, _) => Execute(() =>
             {
-                if (_selectedId == 0)
+                if (_selectedId <= 0)
+                {
                     throw new InvalidOperationException(
                         "Vui lòng chọn phòng cần sửa.");
+                }
 
                 var room = CreateRoom();
                 room.Id = _selectedId;
 
                 _roomService.UpdateRoom(room);
-                MessageBox.Show("Cập nhật phòng chiếu thành công.");
+
+                MessageBox.Show(
+                    "Cập nhật phòng chiếu thành công.",
+                    "Thông báo",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             });
 
-            btnDelete.Click += (s, e) => Execute(() =>
+            btnDelete.Click += (_, _) => Execute(() =>
             {
-                if (_selectedId == 0)
+                if (_selectedId <= 0)
+                {
                     throw new InvalidOperationException(
                         "Vui lòng chọn phòng cần xóa.");
+                }
 
-                if (MessageBox.Show(
+                var confirm = MessageBox.Show(
                     "Bạn có chắc chắn muốn xóa phòng này?",
                     "Xác nhận",
                     MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question) != DialogResult.Yes)
+                    MessageBoxIcon.Question);
+
+                if (confirm != DialogResult.Yes)
                     return;
 
                 _roomService.DeleteRoom(_selectedId);
+
                 ResetForm();
+
+                MessageBox.Show(
+                    "Xóa phòng chiếu thành công.",
+                    "Thông báo",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             });
 
             group.Controls.AddRange(new Control[]
             {
-                txtName, chkActive, numRows, numCols,
-                btnAdd, btnUpdate, btnDelete
+                txtName,
+                chkActive,
+                numRows,
+                numCols,
+                btnAdd,
+                btnUpdate,
+                btnDelete
             });
 
             dgvRooms = new DataGridView
@@ -178,26 +213,36 @@ namespace CinemaManagement.UI.Forms.Catalog
         private Room CreateRoom()
         {
             if (string.IsNullOrWhiteSpace(txtName.Text))
+            {
                 throw new InvalidOperationException(
                     "Vui lòng nhập tên phòng.");
+            }
 
             return new Room
             {
                 Name = txtName.Text.Trim(),
                 TotalRows = (int)numRows.Value,
                 TotalCols = (int)numCols.Value,
+                ScreenType = _selectedRoom?.ScreenType ?? ScreenType.TwoD,
                 IsActive = chkActive.Checked
             };
         }
 
-        private void DgvRooms_CellClick(object sender, DataGridViewCellEventArgs e)
+        private void DgvRooms_CellClick(
+            object? sender,
+            DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 ||
                 dgvRooms.Rows[e.RowIndex].DataBoundItem is not Room room)
+            {
                 return;
+            }
 
             _selectedId = room.Id;
+            _selectedRoom = room;
+
             txtName.Text = room.Name;
+
             numRows.Value = Math.Max(
                 numRows.Minimum,
                 Math.Min(numRows.Maximum, room.TotalRows));
@@ -228,16 +273,20 @@ namespace CinemaManagement.UI.Forms.Catalog
 
         private void LoadRooms()
         {
-            dgvRooms.DataSource = _roomService.GetAllRooms().ToList();
+            dgvRooms.DataSource =
+                _roomService.GetAllRooms().ToList();
         }
 
         private void ResetForm()
         {
             _selectedId = 0;
+            _selectedRoom = null;
+
             txtName.Clear();
             numRows.Value = 10;
             numCols.Value = 12;
             chkActive.Checked = true;
+
             dgvRooms.ClearSelection();
         }
     }

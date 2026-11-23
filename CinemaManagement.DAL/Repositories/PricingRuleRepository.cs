@@ -1,4 +1,4 @@
-﻿
+
 using Dapper;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Enums;
@@ -17,11 +17,13 @@ public sealed class PricingRuleRepository
 
     public override int Insert(PricingRule entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         const string sql = """
             INSERT INTO PricingRules
-                (SeatType, ScreenType, DayType, TimeFrom, TimeTo, Multiplier)
+                (Name, SeatType, ScreenType, DayType, TimeFrom, TimeTo, Multiplier, ExtraFee)
             VALUES
-                (@SeatType, @ScreenType, @DayType, @TimeFrom, @TimeTo, @Multiplier);
+                (@Name, @SeatType, @ScreenType, @DayType, @TimeFrom, @TimeTo, @Multiplier, @ExtraFee);
 
             SELECT last_insert_rowid();
             """;
@@ -30,25 +32,31 @@ public sealed class PricingRuleRepository
 
         return connection.ExecuteScalar<int>(sql, new
         {
+            entity.Name,
             SeatType = (int)entity.SeatType,
             ScreenType = (int)entity.ScreenType,
             entity.DayType,
             entity.TimeFrom,
             entity.TimeTo,
-            entity.Multiplier
+            entity.Multiplier,
+            entity.ExtraFee
         });
     }
 
     public override bool Update(PricingRule entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         const string sql = """
             UPDATE PricingRules
-            SET SeatType = @SeatType,
+            SET Name = @Name,
+                SeatType = @SeatType,
                 ScreenType = @ScreenType,
                 DayType = @DayType,
                 TimeFrom = @TimeFrom,
                 TimeTo = @TimeTo,
-                Multiplier = @Multiplier
+                Multiplier = @Multiplier,
+                ExtraFee = @ExtraFee
             WHERE Id = @Id;
             """;
 
@@ -57,12 +65,14 @@ public sealed class PricingRuleRepository
         return connection.Execute(sql, new
         {
             entity.Id,
+            entity.Name,
             SeatType = (int)entity.SeatType,
             ScreenType = (int)entity.ScreenType,
             entity.DayType,
             entity.TimeFrom,
             entity.TimeTo,
-            entity.Multiplier
+            entity.Multiplier,
+            entity.ExtraFee
         }) > 0;
     }
 
@@ -71,8 +81,8 @@ public sealed class PricingRuleRepository
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Execute(
-            "DELETE FROM PricingRules WHERE Id = @id;",
-            new { id }) > 0;
+            "DELETE FROM PricingRules WHERE Id = @Id;",
+            new { Id = id }) > 0;
     }
 
     public IEnumerable<PricingRule> GetByDayAndSeatType(
@@ -93,16 +103,16 @@ public sealed class PricingRuleRepository
             """
             SELECT *
             FROM PricingRules
-            WHERE (DayType = @dayType OR DayType = 'All')
-              AND SeatType = @seatType
+            WHERE (DayType = @DayType OR DayType = 'All')
+              AND SeatType = @SeatType
             ORDER BY
-                CASE WHEN DayType = @dayType THEN 0 ELSE 1 END,
+                CASE WHEN DayType = @DayType THEN 0 ELSE 1 END,
                 Multiplier DESC;
             """,
             new
             {
-                dayType,
-                seatType = (int)parsedSeatType
+                DayType = dayType,
+                SeatType = (int)parsedSeatType
             }).AsList();
     }
 
@@ -117,18 +127,18 @@ public sealed class PricingRuleRepository
             """
             SELECT *
             FROM PricingRules
-            WHERE SeatType = @seatType
-              AND ScreenType = @screenType
-              AND (DayType = @dayType OR DayType = 'All')
+            WHERE SeatType = @SeatType
+              AND ScreenType = @ScreenType
+              AND (DayType = @DayType OR DayType = 'All')
             ORDER BY
-                CASE WHEN DayType = @dayType THEN 0 ELSE 1 END,
+                CASE WHEN DayType = @DayType THEN 0 ELSE 1 END,
                 Multiplier DESC;
             """,
             new
             {
-                seatType = (int)seatType,
-                screenType = (int)screenType,
-                dayType
+                SeatType = (int)seatType,
+                ScreenType = (int)screenType,
+                DayType = dayType
             }).AsList();
     }
 }

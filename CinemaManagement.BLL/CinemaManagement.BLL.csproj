@@ -1,4 +1,5 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
@@ -7,14 +8,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\CinemaManagement.Core\CinemaManagement.Core.csproj" />
-      <ProjectReference Include="..\CinemaManagement.DAL\CinemaManagement.DAL.csproj" />
+        <ProjectReference Include="..\CinemaManagement.Core\CinemaManagement.Core.csproj" />
+        <ProjectReference Include="..\CinemaManagement.DAL\CinemaManagement.DAL.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="ClosedXML" Version="0.105.1" />
-      <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
-      <PackageReference Include="QuestPDF" Version="2026.9.2" />
+        <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+        <PackageReference Include="ClosedXML" Version="0.105.1" />
+        <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.23" />
+        <PackageReference Include="QuestPDF" Version="2026.9.2" />
     </ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-﻿using CinemaManagement.Core.Entities;
+using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Enums;
 
 namespace CinemaManagement.Core.Interfaces;

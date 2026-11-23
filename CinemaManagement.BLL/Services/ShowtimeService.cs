@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using CinemaManagement.Core.Entities;
@@ -45,7 +45,8 @@ public class ShowtimeService : IShowtimesService
         if (id <= 0)
             throw new BusinessException("Mã suất chiếu không hợp lệ.");
 
-        return _showtimeRepository.GetById(id);
+        return _showtimeRepository.GetById(id)
+            ?? throw new BusinessException("Không tìm thấy suất chiếu.");
     }
 
     public void AddShowtime(Showtime showtime)
@@ -78,28 +79,35 @@ public class ShowtimeService : IShowtimesService
         bool isUpdate)
     {
         if (showtime == null)
-            throw new BusinessException(
-                "Dữ liệu lịch chiếu không hợp lệ.");
+            throw new BusinessException("Dữ liệu lịch chiếu không hợp lệ.");
+
+        if (isUpdate && showtime.Id <= 0)
+            throw new BusinessException("Mã suất chiếu không hợp lệ.");
+
+        if (showtime.MovieId <= 0)
+            throw new BusinessException("Phim được chọn không hợp lệ.");
+
+        if (showtime.RoomId <= 0)
+            throw new BusinessException("Phòng chiếu không hợp lệ.");
 
         if (showtime.BasePrice < 0)
-            throw new BusinessException(
-                "Giá vé cơ bản không được nhỏ hơn 0.");
+            throw new BusinessException("Giá vé cơ bản không được nhỏ hơn 0.");
 
         if (showtime.StartTime <= DateTime.Now)
-            throw new BusinessException(
-                "Thời gian bắt đầu suất chiếu phải ở tương lai.");
+            throw new BusinessException("Thời gian bắt đầu suất chiếu phải ở tương lai.");
 
         var movie = _movieRepository.GetById(showtime.MovieId);
 
         if (movie == null)
-            throw new BusinessException(
-                "Phim được chọn không tồn tại.");
+            throw new BusinessException("Phim được chọn không tồn tại.");
+
+        if (movie.DurationMinutes <= 0)
+            throw new BusinessException("Thời lượng phim không hợp lệ.");
 
         var room = _roomRepository.GetById(showtime.RoomId);
 
         if (room == null || !room.IsActive)
-            throw new BusinessException(
-                "Phòng chiếu không tồn tại hoặc đang ngưng hoạt động.");
+            throw new BusinessException("Phòng chiếu không tồn tại hoặc đang ngưng hoạt động.");
 
         showtime.EndTime = showtime.StartTime.AddMinutes(
             movie.DurationMinutes + CleaningBufferMinutes);

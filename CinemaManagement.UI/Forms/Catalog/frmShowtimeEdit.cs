@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Drawing;
 using System.Linq;
@@ -13,17 +13,19 @@ namespace CinemaManagement.UI.Forms.Catalog
         private readonly IShowtimesService _showtimeService;
         private readonly IMovieService _movieService;
         private readonly IRoomService _roomService;
-        private readonly Showtime _editingShowtime;
+        private readonly Showtime? _editingShowtime;
 
-        private ComboBox cboMovie, cboRoom;
-        private DateTimePicker dtpDate, dtpTime;
-        private NumericUpDown numBasePrice;
+        private ComboBox cboMovie = null!;
+        private ComboBox cboRoom = null!;
+        private DateTimePicker dtpDate = null!;
+        private DateTimePicker dtpTime = null!;
+        private NumericUpDown numBasePrice = null!;
 
         public frmShowtimeEdit(
             IShowtimesService showtimeService,
             IMovieService movieService,
             IRoomService roomService,
-            Showtime showtime = null)
+            Showtime? showtime = null)
         {
             _showtimeService = showtimeService
                 ?? throw new ArgumentNullException(nameof(showtimeService));
@@ -56,6 +58,7 @@ namespace CinemaManagement.UI.Forms.Catalog
             MinimizeBox = false;
 
             AddLabel("Phim:", 25, 28);
+
             cboMovie = new ComboBox
             {
                 Location = new Point(130, 25),
@@ -64,6 +67,7 @@ namespace CinemaManagement.UI.Forms.Catalog
             };
 
             AddLabel("Phòng chiếu:", 25, 68);
+
             cboRoom = new ComboBox
             {
                 Location = new Point(130, 65),
@@ -72,6 +76,7 @@ namespace CinemaManagement.UI.Forms.Catalog
             };
 
             AddLabel("Ngày chiếu:", 25, 108);
+
             dtpDate = new DateTimePicker
             {
                 Location = new Point(130, 105),
@@ -80,6 +85,7 @@ namespace CinemaManagement.UI.Forms.Catalog
             };
 
             AddLabel("Giờ chiếu:", 25, 148);
+
             dtpTime = new DateTimePicker
             {
                 Location = new Point(130, 145),
@@ -89,6 +95,7 @@ namespace CinemaManagement.UI.Forms.Catalog
             };
 
             AddLabel("Giá vé gốc:", 25, 188);
+
             numBasePrice = new NumericUpDown
             {
                 Location = new Point(130, 185),
@@ -115,7 +122,8 @@ namespace CinemaManagement.UI.Forms.Catalog
             };
 
             btnSave.Click += BtnSave_Click;
-            btnCancel.Click += (s, e) =>
+
+            btnCancel.Click += (_, _) =>
             {
                 DialogResult = DialogResult.Cancel;
                 Close();
@@ -123,9 +131,17 @@ namespace CinemaManagement.UI.Forms.Catalog
 
             Controls.AddRange(new Control[]
             {
-                cboMovie, cboRoom, dtpDate, dtpTime,
-                numBasePrice, btnSave, btnCancel
+                cboMovie,
+                cboRoom,
+                dtpDate,
+                dtpTime,
+                numBasePrice,
+                btnSave,
+                btnCancel
             });
+
+            AcceptButton = btnSave;
+            CancelButton = btnCancel;
         }
 
         private void AddLabel(string text, int x, int y)
@@ -146,9 +162,22 @@ namespace CinemaManagement.UI.Forms.Catalog
             cboMovie.DisplayMember = nameof(Movie.Title);
             cboMovie.ValueMember = nameof(Movie.Id);
 
-            var rooms = _roomService.GetAllRooms()
-                .Where(r => r.IsActive)
-                .ToList();
+            var rooms = _roomService.GetAllRooms().ToList();
+
+            if (_editingShowtime == null)
+            {
+                rooms = rooms
+                    .Where(room => room.IsActive)
+                    .ToList();
+            }
+            else
+            {
+                rooms = rooms
+                    .Where(room =>
+                        room.IsActive ||
+                        room.Id == _editingShowtime.RoomId)
+                    .ToList();
+            }
 
             cboRoom.DataSource = rooms;
             cboRoom.DisplayMember = nameof(Room.Name);
@@ -165,33 +194,48 @@ namespace CinemaManagement.UI.Forms.Catalog
 
             numBasePrice.Value = Math.Max(
                 numBasePrice.Minimum,
-                Math.Min(numBasePrice.Maximum, _editingShowtime.BasePrice));
+                Math.Min(
+                    numBasePrice.Maximum,
+                    _editingShowtime.BasePrice));
         }
 
-        private void BtnSave_Click(object sender, EventArgs e)
+        private void BtnSave_Click(object? sender, EventArgs e)
         {
             try
             {
                 if (cboMovie.SelectedValue == null)
+                {
                     throw new InvalidOperationException(
                         "Vui lòng chọn phim.");
+                }
 
                 if (cboRoom.SelectedValue == null)
+                {
                     throw new InvalidOperationException(
                         "Vui lòng chọn phòng chiếu.");
+                }
 
                 var showtime = _editingShowtime ?? new Showtime();
 
-                showtime.MovieId = Convert.ToInt32(cboMovie.SelectedValue);
-                showtime.RoomId = Convert.ToInt32(cboRoom.SelectedValue);
+                showtime.MovieId =
+                    Convert.ToInt32(cboMovie.SelectedValue);
+
+                showtime.RoomId =
+                    Convert.ToInt32(cboRoom.SelectedValue);
+
                 showtime.StartTime = dtpDate.Value.Date.Add(
                     dtpTime.Value.TimeOfDay);
+
                 showtime.BasePrice = numBasePrice.Value;
 
                 if (_editingShowtime == null)
+                {
                     _showtimeService.AddShowtime(showtime);
+                }
                 else
+                {
                     _showtimeService.UpdateShowtime(showtime);
+                }
 
                 DialogResult = DialogResult.OK;
                 Close();

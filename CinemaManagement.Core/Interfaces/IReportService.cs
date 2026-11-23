@@ -6,8 +6,17 @@ namespace CinemaManagement.Core.Interfaces;
 
 public interface IReportService
 {
-    IEnumerable<RevenueByMovieDto> GetRevenueByMovie(DateTime from, DateTime to);
-    IEnumerable<OccupancyDto> GetOccupancy(DateTime from, DateTime to);
-    IEnumerable<dynamic> GetRevenueByDay(DateTime from, DateTime to);
+    IEnumerable<RevenueByMovieDto> GetRevenueByMovie(
+        DateTime fromDate,
+        DateTime toDate);
+
+    IEnumerable<OccupancyDto> GetOccupancyReport(
+        DateTime fromDate,
+        DateTime toDate);
+
+    IEnumerable<dynamic> GetRevenueByDay(
+        DateTime from,
+        DateTime to);
+
     dynamic GetDashboardStats();
 }

@@ -1,12 +1,8 @@
-﻿namespace CinemaManagement.Core.Enums;
+namespace CinemaManagement.Core.Enums;
 
-
-    public enum UserRole
-    {
-        Admin = 1,
-        Manager = 2,
-        Staff = 3
-    }
-
-
-    
+public enum UserRole
+{
+    Admin = 1,
+    Manager = 2,
+    Staff = 3
+}

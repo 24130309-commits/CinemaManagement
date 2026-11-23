@@ -1,4 +1,4 @@
-﻿using CinemaManagement.Core.Enums;
+using CinemaManagement.Core.Enums;
 
 namespace CinemaManagement.Core.Entities;
 
@@ -10,20 +10,19 @@ public class Movie
 
     public string Title { get; set; } = string.Empty;
 
+    public string Description { get; set; } = string.Empty;
+
     public int DurationMinutes
     {
         get => _durationMinutes;
         set => _durationMinutes = value;
     }
 
-    // Tương thích code cũ của B.
     public int Duration
     {
         get => _durationMinutes;
         set => _durationMinutes = value;
     }
-
-    public string Description { get; set; } = string.Empty;
 
     public string PosterPath { get; set; } = string.Empty;
 

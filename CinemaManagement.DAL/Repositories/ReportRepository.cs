@@ -1,4 +1,4 @@
-﻿
+
 using Dapper;
 using CinemaManagement.Core.DTOs;
 using CinemaManagement.Core.Interfaces;
@@ -19,69 +19,64 @@ public sealed class ReportRepository : IReportRepository
     {
         return new
         {
-            from = from.Date.ToString("O"),
-            to = to.Date.AddDays(1).ToString("O")
+            From = from.Date.ToString("yyyy-MM-dd HH:mm:ss"),
+            To = to.Date.AddDays(1).ToString("yyyy-MM-dd HH:mm:ss")
         };
+    }
+
+    public IEnumerable<RevenueByMovieDto> GetRevenueByMovie(
+        DateTime fromDate,
+        DateTime toDate)
+    {
+        using var connection = _factory.CreateConnection();
+
+        const string sql = """
+            SELECT
+                m.Id AS MovieId,
+                m.Title AS MovieTitle,
+                COUNT(DISTINCT s.Id) AS TotalShowtimes,
+                COUNT(t.Id) AS TotalTicketsSold,
+                COUNT(t.Id) AS TicketCount,
+                COALESCE(SUM(t.Price), 0) AS TicketRevenue,
+                0 AS ProductRevenue,
+                COALESCE(SUM(t.Price), 0) AS TotalRevenue
+            FROM Movies m
+            JOIN Showtimes s ON s.MovieId = m.Id
+            LEFT JOIN Tickets t ON t.ShowtimeId = s.Id
+            LEFT JOIN Bookings b
+                ON b.Id = t.BookingId
+                AND b.Status = 1
+            WHERE datetime(s.StartTime) >= datetime(@From)
+              AND datetime(s.StartTime) < datetime(@To)
+              AND (t.Id IS NULL OR b.Id IS NOT NULL)
+            GROUP BY m.Id, m.Title
+            ORDER BY TotalRevenue DESC;
+            """;
+
+        return connection.Query<RevenueByMovieDto>(
+            sql,
+            Range(fromDate, toDate)).AsList();
     }
 
     public IEnumerable<RevenueByMovieDto> RevenueByMovie(
         DateTime from,
         DateTime to)
     {
-        using var c = _factory.CreateConnection();
-
-        const string sql = @"
-            SELECT MovieId,
-                   MovieTitle,
-                   SUM(TicketCount) AS TicketCount,
-                   SUM(TicketRevenue) AS TicketRevenue,
-                   SUM(ProductRevenue) AS ProductRevenue,
-                   SUM(TicketRevenue) + SUM(ProductRevenue) AS TotalRevenue
-            FROM
-            (
-                SELECT m.Id AS MovieId,
-                       m.Title AS MovieTitle,
-                       b.Id AS BookingId,
-                       COUNT(t.Id) AS TicketCount,
-                       COALESCE(SUM(t.Price), 0) AS TicketRevenue,
-                       COALESCE(p.ProductRevenue, 0) AS ProductRevenue
-                FROM Movies m
-                JOIN Showtimes s ON s.MovieId = m.Id
-                JOIN Tickets t ON t.ShowtimeId = s.Id
-                JOIN Bookings b
-                    ON b.Id = t.BookingId
-                    AND b.Status = 1
-                LEFT JOIN
-                (
-                    SELECT bp.BookingId,
-                           SUM(bp.Qty * bp.UnitPrice) AS ProductRevenue
-                    FROM BookingProducts bp
-                    GROUP BY bp.BookingId
-                ) p ON p.BookingId = b.Id
-                WHERE t.Status = 'Active'
-                  AND datetime(b.CreatedAt) >= datetime(@from)
-                  AND datetime(b.CreatedAt) < datetime(@to)
-                GROUP BY m.Id, m.Title, b.Id, p.ProductRevenue
-            ) RevenueByBooking
-            GROUP BY MovieId, MovieTitle
-            ORDER BY TotalRevenue DESC";
-
-        return c.Query<RevenueByMovieDto>(
-            sql,
-            Range(from, to)).AsList();
+        return GetRevenueByMovie(from, to);
     }
 
-    public IEnumerable<OccupancyDto> OccupancyByShowtime(
-        DateTime from,
-        DateTime to)
+    public IEnumerable<OccupancyDto> GetOccupancyReport(
+        DateTime fromDate,
+        DateTime toDate)
     {
-        using var c = _factory.CreateConnection();
+        using var connection = _factory.CreateConnection();
 
-        const string sql = @"
+        const string sql = """
             SELECT
                 s.Id AS ShowtimeId,
                 m.Title AS MovieTitle,
-                s.StartTime AS [Date],
+                s.StartTime AS Date,
+                s.StartTime AS StartTime,
 
                 (
                     SELECT COUNT(*)
@@ -92,82 +87,87 @@ public sealed class ReportRepository : IReportRepository
                 (
                     SELECT COUNT(DISTINCT t.SeatId)
                     FROM Tickets t
-                    JOIN Bookings b ON b.Id = t.BookingId
+                    INNER JOIN Bookings b ON b.Id = t.BookingId
                     WHERE t.ShowtimeId = s.Id
-                      AND t.Status = 'Active'
                       AND b.Status = 1
                 ) AS SoldSeats,
 
                 (
                     SELECT COALESCE(SUM(t.Price), 0)
                     FROM Tickets t
-                    JOIN Bookings b ON b.Id = t.BookingId
+                    INNER JOIN Bookings b ON b.Id = t.BookingId
                     WHERE t.ShowtimeId = s.Id
-                      AND t.Status = 'Active'
                       AND b.Status = 1
                 ) AS TotalPrice
 
             FROM Showtimes s
-            JOIN Movies m ON m.Id = s.MovieId
+            INNER JOIN Movies m ON m.Id = s.MovieId
+            WHERE datetime(s.StartTime) >= datetime(@From)
+              AND datetime(s.StartTime) < datetime(@To)
+            ORDER BY s.StartTime;
+            """;
 
-            WHERE datetime(s.StartTime) >= datetime(@from)
-              AND datetime(s.StartTime) < datetime(@to)
-
-            ORDER BY s.StartTime";
-
-        return c.Query<OccupancyDto>(
+        return connection.Query<OccupancyDto>(
             sql,
-            Range(from, to)).AsList();
+            Range(fromDate, toDate)).AsList();
+    }
+
+    public IEnumerable<OccupancyDto> OccupancyByShowtime(
+        DateTime from,
+        DateTime to)
+    {
+        return GetOccupancyReport(from, to);
     }
 
     public IEnumerable<dynamic> RevenueByDay(
         DateTime from,
         DateTime to)
     {
-        using var c = _factory.CreateConnection();
+        using var connection = _factory.CreateConnection();
 
-        const string sql = @"
+        const string sql = """
             SELECT
                 substr(CreatedAt, 1, 10) AS RevenueDate,
                 COUNT(*) AS BookingCount,
                 COALESCE(SUM(Total), 0) AS Revenue
             FROM Bookings
             WHERE Status = 1
-              AND datetime(CreatedAt) >= datetime(@from)
-              AND datetime(CreatedAt) < datetime(@to)
+              AND datetime(CreatedAt) >= datetime(@From)
+              AND datetime(CreatedAt) < datetime(@To)
             GROUP BY substr(CreatedAt, 1, 10)
-            ORDER BY RevenueDate";
+            ORDER BY RevenueDate;
+            """;
 
-        return c.Query(
-            sql,
-            Range(from, to)).AsList();
+        return connection.Query(sql, Range(from, to)).AsList();
     }
 
     public IEnumerable<RevenueByMovieDto> TopMovies(int n)
     {
-        using var c = _factory.CreateConnection();
+        using var connection = _factory.CreateConnection();
 
-        const string sql = @"
+        const string sql = """
             SELECT
                 m.Id AS MovieId,
                 m.Title AS MovieTitle,
+                COUNT(DISTINCT s.Id) AS TotalShowtimes,
+                COUNT(t.Id) AS TotalTicketsSold,
                 COUNT(t.Id) AS TicketCount,
                 COALESCE(SUM(t.Price), 0) AS TicketRevenue,
                 0 AS ProductRevenue,
                 COALESCE(SUM(t.Price), 0) AS TotalRevenue
             FROM Movies m
-            JOIN Showtimes s ON s.MovieId = m.Id
-            JOIN Tickets t ON t.ShowtimeId = s.Id
-            JOIN Bookings b
+            INNER JOIN Showtimes s ON s.MovieId = m.Id
+            INNER JOIN Tickets t ON t.ShowtimeId = s.Id
+            INNER JOIN Bookings b
                 ON b.Id = t.BookingId
                 AND b.Status = 1
-            WHERE t.Status = 'Active'
             GROUP BY m.Id, m.Title
             ORDER BY TicketCount DESC
-            LIMIT @n";
+            LIMIT @Limit;
+            """;
 
-        return c.Query<RevenueByMovieDto>(
+        return connection.Query<RevenueByMovieDto>(
             sql,
-            new { n = Math.Max(1, n) }).AsList();
+            new { Limit = Math.Max(1, n) }).AsList();
     }
 }

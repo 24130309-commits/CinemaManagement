@@ -1,4 +1,8 @@
-﻿﻿
+
+using System;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Enums;
 using CinemaManagement.Core.Interfaces;
@@ -15,17 +19,25 @@ public partial class frmUserManage : Form
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
-        AutoGenerateColumns = true
+        AutoGenerateColumns = true,
+        AllowUserToAddRows = false,
+        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+        MultiSelect = false,
+        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
     };
 
-    public frmUserManage(IUserService users, IAuditService audit)
+    public frmUserManage(
+        IUserService users,
+        IAuditService audit)
     {
-        _users = users;
-        _audit = audit;
+        _users = users ?? throw new ArgumentNullException(nameof(users));
+        _audit = audit ?? throw new ArgumentNullException(nameof(audit));
 
         InitializeComponent();
 
         Text = "Quản lý người dùng";
+        StartPosition = FormStartPosition.CenterParent;
+        MinimumSize = new Size(900, 550);
         Size = new Size(1050, 650);
 
         var bar = new FlowLayoutPanel
@@ -59,7 +71,6 @@ public partial class frmUserManage : Form
         {
             if (e.RowIndex < 0 ||
                 e.ColumnIndex < 0 ||
-                e.ColumnIndex >= _grid.Columns.Count ||
                 _grid.Columns[e.ColumnIndex].Name != "IsActive" ||
                 e.Value is not bool active)
             {
@@ -67,13 +78,14 @@ public partial class frmUserManage : Form
             }
 
             e.Value = active ? "Đang hoạt động" : "Đã khóa";
-
             e.CellStyle.ForeColor = active
                 ? ThemeHelper.Success
                 : ThemeHelper.Danger;
 
-            e.CellStyle.Font =
-                new Font("Segoe UI", 9f, FontStyle.Bold);
+            e.CellStyle.Font = new Font(
+                "Segoe UI",
+                9f,
+                FontStyle.Bold);
 
             e.FormattingApplied = true;
         };
@@ -88,7 +100,7 @@ public partial class frmUserManage : Form
         string text,
         EventHandler click)
     {
-        var b = new Button
+        var button = new Button
         {
             Text = text,
             AutoSize = true,
@@ -96,9 +108,8 @@ public partial class frmUserManage : Form
             Margin = new Padding(4)
         };
 
-        b.Click += click;
-
-        parent.Controls.Add(b);
+        button.Click += click;
+        parent.Controls.Add(button);
     }
 
     private User? Selected =>
@@ -108,13 +119,14 @@ public partial class frmUserManage : Form
     {
         try
         {
-            _grid.DataSource = _users.GetAll().ToList();
+            _grid.DataSource = _users.GetAllUsers().ToList();
 
-            SetColumn("Id", "Mã NV", false);
+            SetColumn("Id", "Mã nhân viên", false);
             SetColumn("Username", "Tên đăng nhập");
             SetColumn("FullName", "Họ và tên");
+            SetColumn("Email", "Email");
             SetColumn("Role", "Vai trò");
-            SetColumn("IsActive", "Đang hoạt động");
+            SetColumn("IsActive", "Trạng thái");
             SetColumn("PasswordHash", "Mật khẩu", false);
         }
         catch (Exception ex)
@@ -144,7 +156,9 @@ public partial class frmUserManage : Form
 
         try
         {
-            _users.Create(dialog.User);
+            _users.CreateUser(
+                dialog.User,
+                dialog.InitialPassword);
 
             _audit.Log(
                 "USER_CREATE",
@@ -181,14 +195,18 @@ public partial class frmUserManage : Form
 
             updated.Id = user.Id;
             updated.IsActive = user.IsActive;
+            updated.CreatedAt = user.CreatedAt;
+            updated.PasswordHash = user.PasswordHash;
 
-            _users.Update(updated);
+            _users.UpdateUser(updated);
 
             _audit.Log(
                 "USER_UPDATE",
                 $"Cập nhật tài khoản {updated.Username}.");
 
             LoadUsers();
+
+            MessageHelper.Info("Cập nhật thông tin thành công.");
         }
         catch (Exception ex)
         {
@@ -247,7 +265,7 @@ public partial class frmUserManage : Form
 
         try
         {
-            _users.SetActive(user.Id, !user.IsActive);
+            _users.ToggleUserStatus(user.Id);
 
             _audit.Log(
                 "USER_STATUS",
@@ -274,6 +292,8 @@ public partial class frmUserManage : Form
 
         public User User { get; private set; } = new();
 
+        public string InitialPassword => _password.Text;
+
         public UserEditorForm(User? source = null)
         {
             Text = source is null
@@ -281,7 +301,11 @@ public partial class frmUserManage : Form
                 : "Sửa nhân viên";
 
             Size = new Size(440, 390);
+            MinimumSize = new Size(440, 390);
             StartPosition = FormStartPosition.CenterParent;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
 
             AddField("Tên đăng nhập", _username, 25);
             AddField("Họ và tên", _fullName, 95);
@@ -298,30 +322,28 @@ public partial class frmUserManage : Form
                 370,
                 32);
 
-            _role.Items.AddRange(Enum.GetNames<UserRole>());
+            _role.DataSource = Enum.GetValues<UserRole>();
 
             Controls.Add(_role);
 
-            var label = new Label
+            Controls.Add(new Label
             {
                 Text = "Vai trò",
                 Location = new Point(
                     25,
                     source is null ? 222 : 152),
                 AutoSize = true
-            };
-
-            Controls.Add(label);
+            });
 
             if (source is not null)
             {
                 _username.Text = source.Username;
                 _fullName.Text = source.FullName;
-                _role.SelectedItem = source.Role.ToString();
+                _role.SelectedItem = source.Role;
             }
             else
             {
-                _role.SelectedItem = UserRole.Staff.ToString();
+                _role.SelectedItem = UserRole.Staff;
             }
 
             var ok = new Button
@@ -342,15 +364,28 @@ public partial class frmUserManage : Form
                     return;
                 }
 
+                if (source is null &&
+                    string.IsNullOrWhiteSpace(_password.Text))
+                {
+                    MessageHelper.Warning(
+                        "Vui lòng nhập mật khẩu ban đầu.");
+
+                    return;
+                }
+
+                if (_role.SelectedItem is not UserRole selectedRole)
+                {
+                    MessageHelper.Warning(
+                        "Vui lòng chọn vai trò.");
+
+                    return;
+                }
+
                 User = new User
                 {
                     Username = _username.Text.Trim(),
                     FullName = _fullName.Text.Trim(),
-                    PasswordHash = source is null
-                        ? _password.Text
-                        : string.Empty,
-                    Role = Enum.Parse<UserRole>(
-                        _role.SelectedItem?.ToString() ?? "Staff")
+                    Role = selectedRole
                 };
 
                 DialogResult = DialogResult.OK;
@@ -361,12 +396,18 @@ public partial class frmUserManage : Form
             {
                 Text = "Hủy",
                 Location = new Point(320, 300),
-                Size = new Size(75, 36)
+                Size = new Size(75, 36),
+                DialogResult = DialogResult.Cancel
             };
 
-            cancel.Click += (_, _) => Close();
+            Controls.AddRange(new Control[]
+            {
+                ok,
+                cancel
+            });
 
-            Controls.AddRange([ok, cancel]);
+            AcceptButton = ok;
+            CancelButton = cancel;
 
             ThemeHelper.Apply(this);
         }
@@ -384,7 +425,6 @@ public partial class frmUserManage : Form
             });
 
             box.SetBounds(25, y + 25, 370, 30);
-
             Controls.Add(box);
         }
     }
@@ -396,8 +436,11 @@ public partial class frmUserManage : Form
             using var form = new Form
             {
                 Text = title,
-                Size = new Size(430, 170),
-                StartPosition = FormStartPosition.CenterParent
+                Size = new Size(430, 180),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
             };
 
             var label = new Label
@@ -418,17 +461,23 @@ public partial class frmUserManage : Form
             {
                 Text = "Đồng ý",
                 DialogResult = DialogResult.OK,
-                Location = new Point(235, 95)
+                Location = new Point(235, 100)
             };
 
             var cancel = new Button
             {
                 Text = "Hủy",
                 DialogResult = DialogResult.Cancel,
-                Location = new Point(320, 95)
+                Location = new Point(320, 100)
             };
 
-            form.Controls.AddRange([label, input, ok, cancel]);
+            form.Controls.AddRange(new Control[]
+            {
+                label,
+                input,
+                ok,
+                cancel
+            });
 
             form.AcceptButton = ok;
             form.CancelButton = cancel;

@@ -13,7 +13,6 @@ public class SeatUnavailableException : BusinessException
     }
 }
 
-// Tương thích tên lớp bị viết sai trong code cũ.
 [Obsolete("Hãy sử dụng SeatUnavailableException.")]
 public class SeatUnavailbleExcption : SeatUnavailableException
 {

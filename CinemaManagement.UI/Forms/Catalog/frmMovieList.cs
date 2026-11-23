@@ -1,7 +1,7 @@
-﻿
+
 using System;
-using System.Linq;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Interfaces;
@@ -11,14 +11,14 @@ namespace CinemaManagement.UI.Forms.Catalog
     public partial class frmMovieList : Form
     {
         private readonly IMovieService _movieService;
-        private readonly IGenreRepository _genreRepository;
+        private readonly IGenreRepository? _genreRepository;
 
-        private TextBox txtSearch;
-        private DataGridView dgvMovies;
+        private TextBox txtSearch = null!;
+        private DataGridView dgvMovies = null!;
 
         public frmMovieList(
             IMovieService movieService,
-            IGenreRepository genreRepository = null)
+            IGenreRepository? genreRepository = null)
         {
             _movieService = movieService
                 ?? throw new ArgumentNullException(nameof(movieService));
@@ -35,6 +35,8 @@ namespace CinemaManagement.UI.Forms.Catalog
             Text = "Danh sách phim";
             Size = new Size(960, 580);
             StartPosition = FormStartPosition.CenterParent;
+
+            Controls.Clear();
 
             var pnlTop = new Panel
             {
@@ -93,7 +95,11 @@ namespace CinemaManagement.UI.Forms.Catalog
 
             pnlTop.Controls.AddRange(new Control[]
             {
-                txtSearch, btnAdd, btnEdit, btnDelete, btnRefresh
+                txtSearch,
+                btnAdd,
+                btnEdit,
+                btnDelete,
+                btnRefresh
             });
 
             dgvMovies = new DataGridView
@@ -109,7 +115,9 @@ namespace CinemaManagement.UI.Forms.Catalog
             dgvMovies.CellDoubleClick += (s, e) =>
             {
                 if (e.RowIndex >= 0)
+                {
                     BtnEdit_Click(s, e);
+                }
             };
 
             Controls.Add(dgvMovies);
@@ -141,17 +149,19 @@ namespace CinemaManagement.UI.Forms.Catalog
                 .ToList();
         }
 
-        private void BtnAdd_Click(object sender, EventArgs e)
+        private void BtnAdd_Click(object? sender, EventArgs e)
         {
             using var form = new frmMovieEdit(
                 _movieService,
                 _genreRepository);
 
             if (form.ShowDialog(this) == DialogResult.OK)
+            {
                 LoadMovies();
+            }
         }
 
-        private void BtnEdit_Click(object sender, EventArgs e)
+        private void BtnEdit_Click(object? sender, EventArgs e)
         {
             if (dgvMovies.CurrentRow?.DataBoundItem is not Movie movie)
             {
@@ -160,6 +170,7 @@ namespace CinemaManagement.UI.Forms.Catalog
                     "Thông báo",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
+
                 return;
             }
 
@@ -169,14 +180,21 @@ namespace CinemaManagement.UI.Forms.Catalog
                 movie);
 
             if (form.ShowDialog(this) == DialogResult.OK)
+            {
                 LoadMovies();
+            }
         }
 
-        private void BtnDelete_Click(object sender, EventArgs e)
+        private void BtnDelete_Click(object? sender, EventArgs e)
         {
             if (dgvMovies.CurrentRow?.DataBoundItem is not Movie movie)
             {
-                MessageBox.Show("Vui lòng chọn phim cần xóa.");
+                MessageBox.Show(
+                    "Vui lòng chọn phim cần xóa.",
+                    "Thông báo",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
                 return;
             }
 
@@ -187,7 +205,9 @@ namespace CinemaManagement.UI.Forms.Catalog
                 MessageBoxIcon.Question);
 
             if (confirm != DialogResult.Yes)
+            {
                 return;
+            }
 
             try
             {

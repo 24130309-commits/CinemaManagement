@@ -1,4 +1,8 @@
-﻿﻿
+using System;
+using System.Drawing;
+using System.Globalization;
+using System.Linq;
+using System.Windows.Forms;
 using CinemaManagement.Core.Constants;
 using CinemaManagement.Core.Interfaces;
 using CinemaManagement.UI.Helpers;
@@ -26,25 +30,33 @@ public partial class frmSettings : Form
         Width = 120
     };
 
-    private readonly TextBox _cinema = new() { Width = 300 };
+    private readonly TextBox _cinema = new()
+    {
+        Width = 300
+    };
 
     private readonly DataGridView _logs = new()
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
-        AutoGenerateColumns = true
+        AutoGenerateColumns = true,
+        AllowUserToAddRows = false,
+        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
     };
 
     private readonly DateTimePicker _from = new()
     {
         Value = DateTime.Today.AddDays(-7),
-        Width = 150
+        Width = 150,
+        Format = DateTimePickerFormat.Short
     };
 
     private readonly DateTimePicker _to = new()
     {
         Value = DateTime.Today,
-        Width = 150
+        Width = 150,
+        Format = DateTimePickerFormat.Short
     };
 
     private readonly ComboBox _userFilter = new()
@@ -59,10 +71,17 @@ public partial class frmSettings : Form
         IAuditService audit,
         IUserService users)
     {
-        _settings = settings;
-        _backup = backup;
-        _audit = audit;
-        _users = users;
+        _settings = settings
+            ?? throw new ArgumentNullException(nameof(settings));
+
+        _backup = backup
+            ?? throw new ArgumentNullException(nameof(backup));
+
+        _audit = audit
+            ?? throw new ArgumentNullException(nameof(audit));
+
+        _users = users
+            ?? throw new ArgumentNullException(nameof(users));
 
         InitializeComponent();
 
@@ -71,23 +90,23 @@ public partial class frmSettings : Form
         MinimumSize = new Size(980, 680);
         Size = new Size(1050, 720);
 
-        var tabs = new TabControl { Dock = DockStyle.Fill };
+        var tabs = new TabControl
+        {
+            Dock = DockStyle.Fill
+        };
 
         var config = new TabPage("Cấu hình")
         {
-            BackColor = ThemeHelper.Surface,
             Padding = new Padding(18)
         };
 
         var backupPage = new TabPage("Sao lưu / Khôi phục")
         {
-            BackColor = ThemeHelper.Surface,
             Padding = new Padding(18)
         };
 
         var auditPage = new TabPage("Nhật ký thao tác")
         {
-            BackColor = ThemeHelper.Surface,
             Padding = new Padding(18)
         };
 
@@ -95,7 +114,12 @@ public partial class frmSettings : Form
         BuildBackup(backupPage);
         BuildAudit(auditPage);
 
-        tabs.TabPages.AddRange([config, backupPage, auditPage]);
+        tabs.TabPages.AddRange(new[]
+        {
+            config,
+            backupPage,
+            auditPage
+        });
 
         Controls.Add(tabs);
 
@@ -103,6 +127,7 @@ public partial class frmSettings : Form
         {
             LoadSettings();
             LoadUserFilter();
+            LoadAudit();
         };
 
         ThemeHelper.Apply(this);
@@ -145,23 +170,29 @@ public partial class frmSettings : Form
         {
             try
             {
-                _settings.Set(
+                if (string.IsNullOrWhiteSpace(_cinema.Text))
+                {
+                    throw new InvalidOperationException(
+                        "Tên rạp không được để trống.");
+                }
+
+                _settings.SaveSetting(
                     AppConstants.SettingCinemaName,
-                    _cinema.Text);
+                    _cinema.Text.Trim());
 
-                _settings.Set(
+                _settings.SaveSetting(
                     AppConstants.SettingHoldMinutes,
-                    ((int)_hold.Value).ToString());
+                    ((int)_hold.Value).ToString(CultureInfo.InvariantCulture));
 
-                _settings.Set(
+                _settings.SaveSetting(
                     AppConstants.SettingCleaningMinutes,
-                    ((int)_clean.Value).ToString());
+                    ((int)_clean.Value).ToString(CultureInfo.InvariantCulture));
 
                 _audit.Log(
                     "SETTING_UPDATE",
                     "Cập nhật cấu hình hệ thống.");
 
-                MessageHelper.Info("Đã lưu cấu hình.");
+                MessageHelper.ShowInfo("Đã lưu cấu hình.");
             }
             catch (Exception ex)
             {
@@ -203,13 +234,13 @@ public partial class frmSettings : Form
 
             try
             {
-                _backup.Backup(dialog.FileName);
+                _backup.BackupDatabase(dialog.FileName);
 
                 _audit.Log(
                     "DATABASE_BACKUP",
                     "Tạo bản sao lưu cơ sở dữ liệu.");
 
-                MessageHelper.Info("Sao lưu thành công.");
+                MessageHelper.ShowInfo("Sao lưu thành công.");
             }
             catch (Exception ex)
             {
@@ -231,8 +262,10 @@ public partial class frmSettings : Form
                 Filter = "SQLite database (*.db)|*.db|Tất cả tệp (*.*)|*.*"
             };
 
-            if (dialog.ShowDialog() != DialogResult.OK ||
-                !MessageHelper.Confirm(
+            if (dialog.ShowDialog() != DialogResult.OK)
+                return;
+
+            if (!MessageHelper.Confirm(
                     "Khôi phục sẽ thay thế dữ liệu hiện tại. Bạn đã sao lưu dữ liệu mới nhất chưa?"))
             {
                 return;
@@ -240,14 +273,12 @@ public partial class frmSettings : Form
 
             try
             {
-                _backup.Restore(dialog.FileName);
+                _backup.RestoreDatabase(dialog.FileName);
 
-                _audit.Log(
-                    "DATABASE_RESTORE",
-                    "Khôi phục cơ sở dữ liệu từ bản sao lưu.");
-
-                MessageHelper.Info(
+                MessageHelper.ShowInfo(
                     "Khôi phục thành công. Vui lòng khởi động lại ứng dụng.");
+
+                Application.Restart();
             }
             catch (Exception ex)
             {
@@ -255,7 +286,11 @@ public partial class frmSettings : Form
             }
         };
 
-        page.Controls.AddRange([export, restore]);
+        page.Controls.AddRange(new Control[]
+        {
+            export,
+            restore
+        });
     }
 
     private void BuildAudit(TabPage page)
@@ -265,8 +300,7 @@ public partial class frmSettings : Form
             Dock = DockStyle.Top,
             Height = 64,
             Padding = new Padding(12, 10, 8, 8),
-            WrapContents = false,
-            BackColor = ThemeHelper.Surface
+            WrapContents = false
         };
 
         bar.Controls.Add(new Label
@@ -323,9 +357,39 @@ public partial class frmSettings : Form
     {
         try
         {
-            _cinema.Text = _settings.GetCinemaName();
-            _hold.Value = _settings.GetHoldMinutes();
-            _clean.Value = _settings.GetCleaningMinutes();
+            _cinema.Text = _settings.GetValue(
+                AppConstants.SettingCinemaName,
+                AppConstants.DefaultCinemaName);
+
+            var holdText = _settings.GetValue(
+                AppConstants.SettingHoldMinutes,
+                AppConstants.DefaultHoldMinutes.ToString(CultureInfo.InvariantCulture));
+
+            var cleanText = _settings.GetValue(
+                AppConstants.SettingCleaningMinutes,
+                AppConstants.DefaultCleaningMinutes.ToString(CultureInfo.InvariantCulture));
+
+            if (int.TryParse(
+                    holdText,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var holdMinutes))
+            {
+                _hold.Value = Math.Max(
+                    _hold.Minimum,
+                    Math.Min(_hold.Maximum, holdMinutes));
+            }
+
+            if (int.TryParse(
+                    cleanText,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var cleaningMinutes))
+            {
+                _clean.Value = Math.Max(
+                    _clean.Minimum,
+                    Math.Min(_clean.Maximum, cleaningMinutes));
+            }
         }
         catch (Exception ex)
         {
@@ -342,7 +406,7 @@ public partial class frmSettings : Form
             _userFilter.Items.Add(
                 new UserFilterItem(0, "Tất cả người dùng"));
 
-            foreach (var user in _users.GetAll())
+            foreach (var user in _users.GetAllUsers())
             {
                 _userFilter.Items.Add(
                     new UserFilterItem(
@@ -362,18 +426,26 @@ public partial class frmSettings : Form
     {
         try
         {
+            if (_to.Value.Date < _from.Value.Date)
+            {
+                throw new InvalidOperationException(
+                    "Ngày kết thúc không được trước ngày bắt đầu.");
+            }
+
             var selected = _userFilter.SelectedItem as UserFilterItem;
 
             _logs.DataSource = _audit.Search(
                 selected?.Id ?? 0,
                 _from.Value.Date,
-                _to.Value.Date).ToList();
+                _to.Value.Date.AddDays(1).AddTicks(-1))
+                .ToList();
 
             SetAuditColumn("Id", "Mã nhật ký", false);
             SetAuditColumn("UserId", "Mã người dùng");
+            SetAuditColumn("Username", "Người thực hiện");
             SetAuditColumn("Action", "Thao tác");
+            SetAuditColumn("EntityName", "Đối tượng");
             SetAuditColumn("Detail", "Chi tiết");
-
             SetAuditColumn(
                 "CreatedAt",
                 "Thời gian",
@@ -395,7 +467,7 @@ public partial class frmSettings : Form
         if (!_logs.Columns.Contains(name))
             return;
 
-        var column = _logs.Columns[name]!;
+        var column = _logs.Columns[name];
 
         column.HeaderText = header;
         column.Visible = visible;
@@ -406,7 +478,10 @@ public partial class frmSettings : Form
 
     private sealed record UserFilterItem(int Id, string Name)
     {
-        public override string ToString() => Name;
+        public override string ToString()
+        {
+            return Name;
+        }
     }
 
     private static void AddLabel(

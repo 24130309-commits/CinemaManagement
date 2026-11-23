@@ -8,5 +8,8 @@ public interface IRoomRepository : IRepository<Room>
 
     IEnumerable<Room> GetActive();
 
-    int Add(Room room) => Insert(room);
+    int Add(Room room)
+    {
+        return Insert(room);
+    }
 }

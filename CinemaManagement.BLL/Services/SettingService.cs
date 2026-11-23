@@ -33,6 +33,28 @@ public sealed class SettingService : ISettingService
                 ? value
                 : AppConstants.DefaultCinemaName;
 
+    public string? GetValue(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new BusinessException("Tên cấu hình không hợp lệ.");
+
+        return _repository.Get(key);
+    }
+
+    public string GetValue(string key, string defaultValue)
+    {
+        var value = GetValue(key);
+
+        return string.IsNullOrWhiteSpace(value)
+            ? defaultValue
+            : value;
+    }
+
+    public void SaveSetting(string key, string value)
+    {
+        Set(key, value);
+    }
+
     public void Set(string key, string value)
     {
         if (string.IsNullOrWhiteSpace(key))

@@ -4,4 +4,7 @@ public interface IBackupService
 {
     void Backup(string destinationPath);
     void Restore(string sourcePath);
+
+    void BackupDatabase(string destinationPath);
+    void RestoreDatabase(string sourcePath);
 }

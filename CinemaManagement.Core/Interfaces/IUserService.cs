@@ -5,9 +5,15 @@ namespace CinemaManagement.Core.Interfaces;
 
 public interface IUserService
 {
-    IEnumerable<User> GetAll();
-    void Create(User user);
-    void Update(User user);
+    IEnumerable<User> GetAllUsers();
+
+    User GetUserById(int id);
+
+    void CreateUser(User user, string plainPassword);
+
+    void UpdateUser(User user);
+
     void ResetPassword(int userId, string newPassword);
-    void SetActive(int userId, bool isActive);
+
+    void ToggleUserStatus(int userId);
 }

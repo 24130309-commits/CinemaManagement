@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Drawing;
 using System.Linq;
@@ -102,8 +102,11 @@ namespace CinemaManagement.UI.Forms.Catalog
 
             pnlTop.Controls.AddRange(new Control[]
             {
-                dtpFilterDate, btnShowAll,
-                btnAdd, btnEdit, btnDelete
+                dtpFilterDate,
+                btnShowAll,
+                btnAdd,
+                btnEdit,
+                btnDelete
             });
 
             dgvShowtimes = new DataGridView
@@ -149,7 +152,12 @@ namespace CinemaManagement.UI.Forms.Catalog
         {
             if (dgvShowtimes.CurrentRow?.DataBoundItem is not Showtime showtime)
             {
-                MessageBox.Show("Vui lòng chọn suất chiếu cần sửa.");
+                MessageBox.Show(
+                    "Vui lòng chọn suất chiếu cần sửa.",
+                    "Thông báo",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
                 return;
             }
 
@@ -167,7 +175,12 @@ namespace CinemaManagement.UI.Forms.Catalog
         {
             if (dgvShowtimes.CurrentRow?.DataBoundItem is not Showtime showtime)
             {
-                MessageBox.Show("Vui lòng chọn suất chiếu cần xóa.");
+                MessageBox.Show(
+                    "Vui lòng chọn suất chiếu cần xóa.",
+                    "Thông báo",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
                 return;
             }
 

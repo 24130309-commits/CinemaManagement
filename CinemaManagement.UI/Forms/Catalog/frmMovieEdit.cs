@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Drawing;
 using System.Linq;
@@ -7,204 +7,237 @@ using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Enums;
 using CinemaManagement.Core.Interfaces;
 
-namespace CinemaManagement.UI.Forms.Catalog
+namespace CinemaManagement.UI.Forms.Catalog;
+
+public partial class frmMovieEdit : Form
 {
-    public partial class frmMovieEdit : Form
+    private readonly IMovieService _movieService;
+    private readonly IGenreRepository? _genreRepository;
+    private readonly Movie? _editingMovie;
+
+    private TextBox txtTitle = null!;
+    private TextBox txtDescription = null!;
+    private NumericUpDown numDuration = null!;
+    private DateTimePicker dtpReleaseDate = null!;
+    private ComboBox cboStatus = null!;
+    private CheckedListBox clbGenres = null!;
+    private Button btnSave = null!;
+    private Button btnCancel = null!;
+
+    public frmMovieEdit(
+        IMovieService movieService,
+        IGenreRepository? genreRepository = null,
+        Movie? movie = null)
     {
-        private readonly IMovieService _movieService;
-        private readonly IGenreRepository _genreRepository;
-        private readonly Movie _editingMovie;
+        _movieService = movieService
+            ?? throw new ArgumentNullException(nameof(movieService));
 
-        private TextBox txtTitle, txtDescription;
-        private NumericUpDown numDuration;
-        private DateTimePicker dtpReleaseDate;
-        private ComboBox cboStatus;
-        private CheckedListBox clbGenres;
+        _genreRepository = genreRepository;
+        _editingMovie = movie;
 
-        public frmMovieEdit(
-            IMovieService movieService,
-            IGenreRepository genreRepository = null,
-            Movie movie = null)
+        InitializeComponent();
+        BuildLayout();
+        LoadGenres();
+        BindMovieData();
+    }
+
+    private void BuildLayout()
+    {
+        Text = _editingMovie == null
+            ? "Thêm phim mới"
+            : "Cập nhật thông tin phim";
+
+        Size = new Size(540, 430);
+        MinimumSize = new Size(540, 430);
+        StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+
+        Controls.Clear();
+
+        AddLabel("Tên phim:", 25, 25);
+
+        txtTitle = new TextBox
         {
-            _movieService = movieService
-                ?? throw new ArgumentNullException(nameof(movieService));
+            Location = new Point(145, 22),
+            Width = 350
+        };
 
-            _genreRepository = genreRepository;
-            _editingMovie = movie;
+        AddLabel("Thời lượng (phút):", 25, 62);
 
-            InitializeComponent();
-            BuildLayout();
-            LoadGenres();
-            BindMovieData();
-        }
-
-        private void BuildLayout()
+        numDuration = new NumericUpDown
         {
-            Text = _editingMovie == null
-                ? "Thêm phim mới"
-                : "Cập nhật thông tin phim";
+            Location = new Point(145, 59),
+            Width = 100,
+            Minimum = 1,
+            Maximum = 500,
+            Value = 120
+        };
 
-            Size = new Size(540, 430);
-            StartPosition = FormStartPosition.CenterParent;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false;
-            MinimizeBox = false;
+        AddLabel("Ngày khởi chiếu:", 260, 62);
 
-            Controls.Clear();
-
-            AddLabel("Tên phim:", 25, 25);
-            txtTitle = new TextBox
-            {
-                Location = new Point(145, 22),
-                Width = 350
-            };
-
-            AddLabel("Thời lượng (phút):", 25, 62);
-            numDuration = new NumericUpDown
-            {
-                Location = new Point(145, 59),
-                Width = 100,
-                Minimum = 1,
-                Maximum = 500,
-                Value = 120
-            };
-
-            AddLabel("Ngày khởi chiếu:", 260, 62);
-            dtpReleaseDate = new DateTimePicker
-            {
-                Location = new Point(365, 59),
-                Width = 130,
-                Format = DateTimePickerFormat.Short
-            };
-
-            AddLabel("Trạng thái:", 25, 99);
-            cboStatus = new ComboBox
-            {
-                Location = new Point(145, 96),
-                Width = 180,
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                DataSource = Enum.GetValues(typeof(MovieStatus))
-            };
-
-            AddLabel("Thể loại:", 25, 136);
-            clbGenres = new CheckedListBox
-            {
-                Location = new Point(145, 133),
-                Size = new Size(350, 85),
-                CheckOnClick = true
-            };
-
-            AddLabel("Mô tả:", 25, 232);
-            txtDescription = new TextBox
-            {
-                Location = new Point(145, 229),
-                Size = new Size(350, 80),
-                Multiline = true,
-                ScrollBars = ScrollBars.Vertical
-            };
-
-            var btnSave = new Button
-            {
-                Text = "Lưu thông tin",
-                Location = new Point(280, 330),
-                Size = new Size(105, 32)
-            };
-
-            var btnCancel = new Button
-            {
-                Text = "Hủy",
-                Location = new Point(395, 330),
-                Size = new Size(100, 32)
-            };
-
-            btnSave.Click += BtnSave_Click;
-            btnCancel.Click += (s, e) =>
-            {
-                DialogResult = DialogResult.Cancel;
-                Close();
-            };
-
-            Controls.AddRange(new Control[]
-            {
-                txtTitle, numDuration, dtpReleaseDate,
-                cboStatus, clbGenres, txtDescription,
-                btnSave, btnCancel
-            });
-        }
-
-        private void AddLabel(string text, int x, int y)
+        dtpReleaseDate = new DateTimePicker
         {
-            Controls.Add(new Label
+            Location = new Point(365, 59),
+            Width = 130,
+            Format = DateTimePickerFormat.Short
+        };
+
+        AddLabel("Trạng thái:", 25, 99);
+
+        cboStatus = new ComboBox
+        {
+            Location = new Point(145, 96),
+            Width = 180,
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            DataSource = Enum.GetValues(typeof(MovieStatus))
+        };
+
+        AddLabel("Thể loại:", 25, 136);
+
+        clbGenres = new CheckedListBox
+        {
+            Location = new Point(145, 133),
+            Size = new Size(350, 85),
+            CheckOnClick = true
+        };
+
+        AddLabel("Mô tả:", 25, 232);
+
+        txtDescription = new TextBox
+        {
+            Location = new Point(145, 229),
+            Size = new Size(350, 80),
+            Multiline = true,
+            ScrollBars = ScrollBars.Vertical
+        };
+
+        btnSave = new Button
+        {
+            Text = "Lưu thông tin",
+            Location = new Point(280, 330),
+            Size = new Size(105, 32)
+        };
+
+        btnCancel = new Button
+        {
+            Text = "Hủy",
+            Location = new Point(395, 330),
+            Size = new Size(100, 32)
+        };
+
+        btnSave.Click += BtnSave_Click;
+
+        btnCancel.Click += (_, _) =>
+        {
+            DialogResult = DialogResult.Cancel;
+            Close();
+        };
+
+        Controls.AddRange(new Control[]
+        {
+            txtTitle,
+            numDuration,
+            dtpReleaseDate,
+            cboStatus,
+            clbGenres,
+            txtDescription,
+            btnSave,
+            btnCancel
+        });
+
+        AcceptButton = btnSave;
+        CancelButton = btnCancel;
+    }
+
+    private void AddLabel(string text, int x, int y)
+    {
+        Controls.Add(new Label
+        {
+            Text = text,
+            Location = new Point(x, y),
+            AutoSize = true
+        });
+    }
+
+    private void LoadGenres()
+    {
+        if (_genreRepository == null)
+            return;
+
+        var genres = _genreRepository.GetAll().ToList();
+
+        clbGenres.DataSource = genres;
+        clbGenres.DisplayMember = nameof(Genre.Name);
+        clbGenres.ValueMember = nameof(Genre.Id);
+    }
+
+    private void BindMovieData()
+    {
+        if (_editingMovie == null)
+            return;
+
+        txtTitle.Text = _editingMovie.Title ?? string.Empty;
+
+        numDuration.Value = Math.Max(
+            numDuration.Minimum,
+            Math.Min(
+                numDuration.Maximum,
+                _editingMovie.DurationMinutes));
+
+        dtpReleaseDate.Value =
+            _editingMovie.ReleaseDate == default
+                ? DateTime.Today
+                : _editingMovie.ReleaseDate;
+
+        cboStatus.SelectedItem = _editingMovie.Status;
+        txtDescription.Text = _editingMovie.Description ?? string.Empty;
+    }
+
+    private void BtnSave_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(txtTitle.Text))
             {
-                Text = text,
-                Location = new Point(x, y),
-                AutoSize = true
-            });
-        }
+                throw new InvalidOperationException(
+                    "Vui lòng nhập tên phim.");
+            }
 
-        private void LoadGenres()
-        {
-            if (_genreRepository == null)
-                return;
+            if (cboStatus.SelectedItem == null)
+            {
+                throw new InvalidOperationException(
+                    "Vui lòng chọn trạng thái phim.");
+            }
 
-            var genres = _genreRepository.GetAll().ToList();
+            var movie = _editingMovie ?? new Movie();
 
-            clbGenres.DataSource = genres;
-            clbGenres.DisplayMember = nameof(Genre.Name);
-            clbGenres.ValueMember = nameof(Genre.Id);
-        }
+            movie.Title = txtTitle.Text.Trim();
+            movie.DurationMinutes = (int)numDuration.Value;
+            movie.ReleaseDate = dtpReleaseDate.Value.Date;
+            movie.Status = (MovieStatus)cboStatus.SelectedItem;
+            movie.Description = txtDescription.Text.Trim();
 
-        private void BindMovieData()
-        {
             if (_editingMovie == null)
-                return;
+            {
+                _movieService.AddMovie(movie);
+            }
+            else
+            {
+                _movieService.UpdateMovie(movie);
+            }
 
-            txtTitle.Text = _editingMovie.Title ?? string.Empty;
-
-            numDuration.Value = Math.Max(
-                numDuration.Minimum,
-                Math.Min(numDuration.Maximum, _editingMovie.DurationMinutes));
-
-            dtpReleaseDate.Value =
-                _editingMovie.ReleaseDate == default
-                    ? DateTime.Today
-                    : _editingMovie.ReleaseDate;
-
-            cboStatus.SelectedItem = _editingMovie.Status;
-            txtDescription.Text = _editingMovie.Description ?? string.Empty;
+            DialogResult = DialogResult.OK;
+            Close();
         }
-
-        private void BtnSave_Click(object sender, EventArgs e)
+        catch (Exception ex)
         {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(txtTitle.Text))
-                    throw new InvalidOperationException("Vui lòng nhập tên phim.");
-
-                var movie = _editingMovie ?? new Movie();
-
-                movie.Title = txtTitle.Text.Trim();
-                movie.DurationMinutes = (int)numDuration.Value;
-                movie.ReleaseDate = dtpReleaseDate.Value.Date;
-                movie.Status = (MovieStatus)cboStatus.SelectedItem;
-                movie.Description = txtDescription.Text.Trim();
-
-                if (_editingMovie == null)
-                    _movieService.AddMovie(movie);
-                else
-                    _movieService.UpdateMovie(movie);
-
-                DialogResult = DialogResult.OK;
-                Close();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    ex.Message,
-                    "Không thể lưu phim",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-            }
+            MessageBox.Show(
+                ex.Message,
+                "Không thể lưu phim",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
         }
     }
 }

@@ -18,17 +18,23 @@ public sealed class ReportService : IReportService
         _factory = factory;
     }
 
-    public IEnumerable<RevenueByMovieDto> GetRevenueByMovie(DateTime from, DateTime to)
+    public IEnumerable<RevenueByMovieDto> GetRevenueByMovie(
+        DateTime from,
+        DateTime to)
     {
         return ValidateRange(from, to, _reports.RevenueByMovie);
     }
 
-    public IEnumerable<OccupancyDto> GetOccupancy(DateTime from, DateTime to)
+    public IEnumerable<OccupancyDto> GetOccupancyReport(
+        DateTime from,
+        DateTime to)
     {
         return ValidateRange(from, to, _reports.OccupancyByShowtime);
     }
 
-    public IEnumerable<dynamic> GetRevenueByDay(DateTime from, DateTime to)
+    public IEnumerable<dynamic> GetRevenueByDay(
+        DateTime from,
+        DateTime to)
     {
         return ValidateRange(from, to, _reports.RevenueByDay);
     }
@@ -42,11 +48,11 @@ public sealed class ReportService : IReportService
         var tickets = c.ExecuteScalar<int>(
             @"SELECT COUNT(*)
               FROM Tickets t
-              JOIN Bookings b ON b.Id=t.BookingId
-              WHERE b.Status=1
-                AND t.Status='Active'
-                AND datetime(b.CreatedAt)>=datetime(@from)
-                AND datetime(b.CreatedAt)<datetime(@to)",
+              JOIN Bookings b ON b.Id = t.BookingId
+              WHERE b.Status = 1
+                AND t.Status = 'Active'
+                AND datetime(b.CreatedAt) >= datetime(@from)
+                AND datetime(b.CreatedAt) < datetime(@to)",
             new
             {
                 from = today.ToString("O"),
@@ -54,11 +60,11 @@ public sealed class ReportService : IReportService
             });
 
         var revenue = c.ExecuteScalar<decimal>(
-            @"SELECT COALESCE(SUM(Total),0)
+            @"SELECT COALESCE(SUM(Total), 0)
               FROM Bookings
-              WHERE Status=1
-                AND datetime(CreatedAt)>=datetime(@from)
-                AND datetime(CreatedAt)<datetime(@to)",
+              WHERE Status = 1
+                AND datetime(CreatedAt) >= datetime(@from)
+                AND datetime(CreatedAt) < datetime(@to)",
             new
             {
                 from = today.ToString("O"),
@@ -66,11 +72,11 @@ public sealed class ReportService : IReportService
             });
 
         var last7 = c.ExecuteScalar<decimal>(
-            @"SELECT COALESCE(SUM(Total),0)
+            @"SELECT COALESCE(SUM(Total), 0)
               FROM Bookings
-              WHERE Status=1
-                AND datetime(CreatedAt)>=datetime(@from)
-                AND datetime(CreatedAt)<datetime(@to)",
+              WHERE Status = 1
+                AND datetime(CreatedAt) >= datetime(@from)
+                AND datetime(CreatedAt) < datetime(@to)",
             new
             {
                 from = today.AddDays(-6).ToString("O"),
@@ -78,18 +84,20 @@ public sealed class ReportService : IReportService
             });
 
         var last30 = c.ExecuteScalar<decimal>(
-            @"SELECT COALESCE(SUM(Total),0)
+            @"SELECT COALESCE(SUM(Total), 0)
               FROM Bookings
-              WHERE Status=1
-                AND datetime(CreatedAt)>=datetime(@from)
-                AND datetime(CreatedAt)<datetime(@to)",
+              WHERE Status = 1
+                AND datetime(CreatedAt) >= datetime(@from)
+                AND datetime(CreatedAt) < datetime(@to)",
             new
             {
                 from = today.AddDays(-29).ToString("O"),
                 to = today.AddDays(1).ToString("O")
             });
 
-        var trend = _reports.RevenueByDay(today.AddDays(-6), today).ToList();
+        var trend = _reports
+            .RevenueByDay(today.AddDays(-6), today)
+            .ToList();
 
         var upcoming = c.Query(
             @"SELECT s.Id AS ShowtimeId,
@@ -99,22 +107,26 @@ public sealed class ReportService : IReportService
                      s.EndTime,
                      (SELECT COUNT(*)
                       FROM Seats se
-                      WHERE se.RoomId=s.RoomId)
+                      WHERE se.RoomId = s.RoomId)
                      -
                      (SELECT COUNT(DISTINCT t.SeatId)
                       FROM Tickets t
-                      JOIN Bookings b ON b.Id=t.BookingId
-                      WHERE t.ShowtimeId=s.Id
-                        AND t.Status='Active'
-                        AND b.Status=1) AS SeatsLeft
+                      JOIN Bookings b ON b.Id = t.BookingId
+                      WHERE t.ShowtimeId = s.Id
+                        AND t.Status = 'Active'
+                        AND b.Status = 1) AS SeatsLeft
               FROM Showtimes s
-              JOIN Movies m ON m.Id=s.MovieId
-              JOIN Rooms r ON r.Id=s.RoomId
-              WHERE s.IsActive=1
-                AND datetime(s.StartTime)>=datetime(@now)
+              JOIN Movies m ON m.Id = s.MovieId
+              JOIN Rooms r ON r.Id = s.RoomId
+              WHERE s.IsActive = 1
+                AND datetime(s.StartTime) >= datetime(@now)
               ORDER BY s.StartTime
               LIMIT 8",
-            new { now = DateTime.Now.ToString("O") }).AsList();
+            new
+            {
+                now = DateTime.Now.ToString("O")
+            })
+            .AsList();
 
         return new
         {
@@ -135,7 +147,8 @@ public sealed class ReportService : IReportService
     {
         if (from.Date > to.Date)
         {
-            throw new ArgumentException("Ngày bắt đầu không được sau ngày kết thúc.");
+            throw new ArgumentException(
+                "Ngày bắt đầu không được sau ngày kết thúc.");
         }
 
         return query(from, to);

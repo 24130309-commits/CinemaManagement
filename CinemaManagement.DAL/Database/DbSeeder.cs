@@ -1,4 +1,4 @@
-﻿
+
 using Dapper;
 using CinemaManagement.Core.Constants;
 using CinemaManagement.Core.Enums;
@@ -30,15 +30,16 @@ public sealed class DbSeeder
         {
             connection.Execute(
                 @"INSERT INTO Users
-                    (Username, PasswordHash, FullName, Role, IsActive)
+                    (Username, PasswordHash, FullName, Email, Role, IsActive)
                   VALUES
-                    (@Username, @PasswordHash, @FullName, @Role, 1)",
+                    (@Username, @PasswordHash, @FullName, @Email, @Role, 1)",
                 new
                 {
                     Username = AppConstants.DefaultAdminUsername,
                     PasswordHash = global::BCrypt.Net.BCrypt.HashPassword(
                         AppConstants.DefaultAdminPassword),
-                    FullName = "Quản trị viên",
+                    FullName = "Quản trị viên Hệ thống",
+                    Email = "admin@cinema.vn",
                     Role = (int)UserRole.Admin
                 },
                 transaction);
@@ -73,8 +74,10 @@ public sealed class DbSeeder
                 transaction: transaction) == 0)
         {
             connection.Execute(
-                "INSERT INTO Genres(Name) VALUES " +
-                "('Hành động'), ('Tâm lý'), ('Hoạt hình')",
+                @"INSERT INTO Genres(Name) VALUES
+                    ('Hành động'),
+                    ('Tâm lý'),
+                    ('Hoạt hình')",
                 transaction: transaction);
         }
 
@@ -121,7 +124,10 @@ public sealed class DbSeeder
                     (Name, TotalRows, TotalCols, ScreenType, IsActive)
                   VALUES
                     ('Phòng 1', 6, 8, @ScreenType, 1)",
-                new { ScreenType = (int)ScreenType.TwoD },
+                new
+                {
+                    ScreenType = (int)ScreenType.TwoD
+                },
                 transaction);
 
             var roomId = connection.ExecuteScalar<long>(

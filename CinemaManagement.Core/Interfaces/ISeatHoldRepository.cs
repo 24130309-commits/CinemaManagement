@@ -6,6 +6,11 @@ public interface ISeatHoldRepository
 {
     List<SeatHold> GetActiveHoldsByShowtime(int showtimeId);
 
+    List<SeatHold> GetActiveHoldsByShowTime(int showtimeId)
+    {
+        return GetActiveHoldsByShowtime(showtimeId);
+    }
+
     SeatHold? GetById(int id);
 
     void Add(SeatHold seatHold);
@@ -13,10 +18,4 @@ public interface ISeatHoldRepository
     void Update(SeatHold seatHold);
 
     void ReleaseExpiredHolds();
-
-    // Tương thích tên phương thức cũ.
-    List<SeatHold> GetActiveHoldsByShowTime(int showtimeId)
-    {
-        return GetActiveHoldsByShowtime(showtimeId);
-    }
 }

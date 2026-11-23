@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Drawing;
 using System.Linq;
@@ -13,13 +13,15 @@ namespace CinemaManagement.UI.Forms.Management
     {
         private readonly IPricingService _pricingService;
 
-        private ComboBox cboSeatType;
-        private ComboBox cboScreenType;
-        private ComboBox cboDayType;
-        private DateTimePicker dtpTimeFrom;
-        private DateTimePicker dtpTimeTo;
-        private NumericUpDown numMultiplier;
-        private DataGridView dgvRules;
+        private TextBox txtRuleName = null!;
+        private ComboBox cboSeatType = null!;
+        private ComboBox cboScreenType = null!;
+        private ComboBox cboDayType = null!;
+        private DateTimePicker dtpTimeFrom = null!;
+        private DateTimePicker dtpTimeTo = null!;
+        private NumericUpDown numMultiplier = null!;
+        private NumericUpDown numExtraFee = null!;
+        private DataGridView dgvRules = null!;
 
         private int _selectedId;
 
@@ -38,62 +40,79 @@ namespace CinemaManagement.UI.Forms.Management
             Controls.Clear();
 
             Text = "Quản lý quy tắc giá vé";
-            Size = new Size(900, 540);
+            Size = new Size(960, 650);
+            MinimumSize = new Size(900, 600);
             StartPosition = FormStartPosition.CenterParent;
 
             var group = new GroupBox
             {
                 Text = "Thông tin quy tắc giá",
                 Location = new Point(15, 15),
-                Size = new Size(850, 175)
+                Size = new Size(915, 245)
             };
 
-            AddLabel(group, "Loại ghế:", 20, 30);
+            AddLabel(group, "Tên quy tắc:", 20, 32);
+
+            txtRuleName = new TextBox
+            {
+                Location = new Point(110, 29),
+                Width = 200
+            };
+
+            AddLabel(group, "Loại ghế:", 335, 32);
+
             cboSeatType = new ComboBox
             {
-                Location = new Point(105, 27),
+                Location = new Point(410, 29),
                 Width = 150,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 DataSource = Enum.GetValues(typeof(SeatType))
             };
 
-            AddLabel(group, "Loại màn hình:", 280, 30);
+            AddLabel(group, "Loại màn hình:", 585, 32);
+
             cboScreenType = new ComboBox
             {
-                Location = new Point(390, 27),
-                Width = 150,
+                Location = new Point(690, 29),
+                Width = 180,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 DataSource = Enum.GetValues(typeof(ScreenType))
             };
 
-            AddLabel(group, "Ngày áp dụng:", 20, 70);
+            AddLabel(group, "Ngày áp dụng:", 20, 77);
+
             cboDayType = new ComboBox
             {
-                Location = new Point(105, 67),
-                Width = 150,
+                Location = new Point(110, 74),
+                Width = 200,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
 
             cboDayType.Items.AddRange(new object[]
             {
+                "All",
                 "Weekday",
                 "Weekend",
                 "Holiday"
             });
+
             cboDayType.SelectedIndex = 0;
 
-            AddLabel(group, "Từ giờ:", 280, 70);
-            dtpTimeFrom = CreateTimePicker(350, 67);
+            AddLabel(group, "Từ giờ:", 335, 77);
 
-            AddLabel(group, "Đến giờ:", 530, 70);
-            dtpTimeTo = CreateTimePicker(600, 67);
+            dtpTimeFrom = CreateTimePicker(410, 74);
+
+            AddLabel(group, "Đến giờ:", 585, 77);
+
+            dtpTimeTo = CreateTimePicker(690, 74);
             dtpTimeTo.Value = DateTime.Today.AddHours(23);
 
-            AddLabel(group, "Hệ số giá:", 20, 110);
+            AddLabel(group, "Hệ số giá:", 20, 122);
+
             numMultiplier = new NumericUpDown
             {
-                Location = new Point(105, 107),
-                Width = 150,
+                Location = new Point(110, 119),
+                Width = 200,
                 DecimalPlaces = 2,
                 Minimum = 0.10M,
                 Maximum = 10M,
@@ -101,32 +120,44 @@ namespace CinemaManagement.UI.Forms.Management
                 Value = 1.00M
             };
 
+            AddLabel(group, "Phụ thu (VNĐ):", 335, 122);
+
+            numExtraFee = new NumericUpDown
+            {
+                Location = new Point(435, 119),
+                Width = 200,
+                Minimum = -200000,
+                Maximum = 500000,
+                Increment = 5000,
+                ThousandsSeparator = true
+            };
+
             var btnAdd = new Button
             {
                 Text = "Thêm",
-                Location = new Point(280, 105),
-                Size = new Size(85, 30)
+                Location = new Point(20, 180),
+                Size = new Size(100, 32)
             };
 
             var btnUpdate = new Button
             {
                 Text = "Cập nhật",
-                Location = new Point(375, 105),
-                Size = new Size(90, 30)
+                Location = new Point(135, 180),
+                Size = new Size(100, 32)
             };
 
             var btnDelete = new Button
             {
                 Text = "Xóa",
-                Location = new Point(475, 105),
-                Size = new Size(85, 30)
+                Location = new Point(250, 180),
+                Size = new Size(100, 32)
             };
 
             var btnReset = new Button
             {
                 Text = "Làm mới",
-                Location = new Point(570, 105),
-                Size = new Size(90, 30)
+                Location = new Point(365, 180),
+                Size = new Size(100, 32)
             };
 
             btnAdd.Click += (s, e) => Execute(() =>
@@ -138,8 +169,10 @@ namespace CinemaManagement.UI.Forms.Management
             btnUpdate.Click += (s, e) => Execute(() =>
             {
                 if (_selectedId == 0)
+                {
                     throw new InvalidOperationException(
                         "Vui lòng chọn quy tắc cần cập nhật.");
+                }
 
                 var rule = CreateRule();
                 rule.Id = _selectedId;
@@ -150,15 +183,21 @@ namespace CinemaManagement.UI.Forms.Management
             btnDelete.Click += (s, e) => Execute(() =>
             {
                 if (_selectedId == 0)
+                {
                     throw new InvalidOperationException(
                         "Vui lòng chọn quy tắc cần xóa.");
+                }
 
-                if (MessageBox.Show(
+                var confirm = MessageBox.Show(
                     "Bạn có chắc chắn muốn xóa quy tắc này?",
                     "Xác nhận",
                     MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question) != DialogResult.Yes)
+                    MessageBoxIcon.Question);
+
+                if (confirm != DialogResult.Yes)
+                {
                     return;
+                }
 
                 _pricingService.DeleteRule(_selectedId);
                 ResetForm();
@@ -168,15 +207,24 @@ namespace CinemaManagement.UI.Forms.Management
 
             group.Controls.AddRange(new Control[]
             {
-                cboSeatType, cboScreenType, cboDayType,
-                dtpTimeFrom, dtpTimeTo, numMultiplier,
-                btnAdd, btnUpdate, btnDelete, btnReset
+                txtRuleName,
+                cboSeatType,
+                cboScreenType,
+                cboDayType,
+                dtpTimeFrom,
+                dtpTimeTo,
+                numMultiplier,
+                numExtraFee,
+                btnAdd,
+                btnUpdate,
+                btnDelete,
+                btnReset
             });
 
             dgvRules = new DataGridView
             {
-                Location = new Point(15, 205),
-                Size = new Size(850, 285),
+                Location = new Point(15, 275),
+                Size = new Size(915, 320),
                 ReadOnly = true,
                 AllowUserToAddRows = false,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
@@ -190,7 +238,11 @@ namespace CinemaManagement.UI.Forms.Management
             Controls.Add(dgvRules);
         }
 
-        private static void AddLabel(Control parent, string text, int x, int y)
+        private static void AddLabel(
+            Control parent,
+            string text,
+            int x,
+            int y)
         {
             parent.Controls.Add(new Label
             {
@@ -205,7 +257,7 @@ namespace CinemaManagement.UI.Forms.Management
             return new DateTimePicker
             {
                 Location = new Point(x, y),
-                Width = 130,
+                Width = 150,
                 Format = DateTimePickerFormat.Time,
                 ShowUpDown = true,
                 Value = DateTime.Today.AddHours(8)
@@ -214,41 +266,72 @@ namespace CinemaManagement.UI.Forms.Management
 
         private PricingRule CreateRule()
         {
+            if (string.IsNullOrWhiteSpace(txtRuleName.Text))
+            {
+                throw new InvalidOperationException(
+                    "Vui lòng nhập tên quy tắc giá.");
+            }
+
             if (dtpTimeTo.Value.TimeOfDay <= dtpTimeFrom.Value.TimeOfDay)
+            {
                 throw new InvalidOperationException(
                     "Giờ kết thúc phải sau giờ bắt đầu.");
+            }
+
+            if (cboSeatType.SelectedItem is not SeatType seatType ||
+                cboScreenType.SelectedItem is not ScreenType screenType)
+            {
+                throw new InvalidOperationException(
+                    "Vui lòng chọn loại ghế và loại màn hình.");
+            }
 
             return new PricingRule
             {
-                SeatType = (SeatType)cboSeatType.SelectedItem,
-                ScreenType = (ScreenType)cboScreenType.SelectedItem,
-                DayType = cboDayType.SelectedItem?.ToString(),
+                Name = txtRuleName.Text.Trim(),
+                SeatType = seatType,
+                ScreenType = screenType,
+                DayType = cboDayType.SelectedItem?.ToString() ?? "All",
                 TimeFrom = dtpTimeFrom.Value.ToString("HH:mm"),
                 TimeTo = dtpTimeTo.Value.ToString("HH:mm"),
-                Multiplier = numMultiplier.Value
+                Multiplier = numMultiplier.Value,
+                ExtraFee = numExtraFee.Value
             };
         }
 
-        private void DgvRules_CellClick(object sender, DataGridViewCellEventArgs e)
+        private void DgvRules_CellClick(
+            object? sender,
+            DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 ||
                 dgvRules.Rows[e.RowIndex].DataBoundItem is not PricingRule rule)
+            {
                 return;
+            }
 
             _selectedId = rule.Id;
+
+            txtRuleName.Text = rule.Name;
             cboSeatType.SelectedItem = rule.SeatType;
             cboScreenType.SelectedItem = rule.ScreenType;
             cboDayType.SelectedItem = rule.DayType;
 
             if (TimeSpan.TryParse(rule.TimeFrom, out var from))
+            {
                 dtpTimeFrom.Value = DateTime.Today.Add(from);
+            }
 
             if (TimeSpan.TryParse(rule.TimeTo, out var to))
+            {
                 dtpTimeTo.Value = DateTime.Today.Add(to);
+            }
 
             numMultiplier.Value = Math.Max(
                 numMultiplier.Minimum,
                 Math.Min(numMultiplier.Maximum, rule.Multiplier));
+
+            numExtraFee.Value = Math.Max(
+                numExtraFee.Minimum,
+                Math.Min(numExtraFee.Maximum, rule.ExtraFee));
         }
 
         private void Execute(Action action)
@@ -277,12 +360,18 @@ namespace CinemaManagement.UI.Forms.Management
         private void ResetForm()
         {
             _selectedId = 0;
+
+            txtRuleName.Clear();
             cboSeatType.SelectedIndex = 0;
             cboScreenType.SelectedIndex = 0;
             cboDayType.SelectedIndex = 0;
+
             dtpTimeFrom.Value = DateTime.Today.AddHours(8);
             dtpTimeTo.Value = DateTime.Today.AddHours(23);
+
             numMultiplier.Value = 1.00M;
+            numExtraFee.Value = 0;
+
             dgvRules.ClearSelection();
         }
     }

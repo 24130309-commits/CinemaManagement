@@ -1,6 +1,6 @@
-﻿
-﻿
+
 using CinemaManagement.BLL.Session;
+using CinemaManagement.Core.Exceptions;
 using CinemaManagement.Core.Interfaces;
 using CinemaManagement.UI.Helpers;
 
@@ -21,13 +21,14 @@ public partial class frmChangePassword : Form
         CurrentUserSession session,
         IAuditService audit)
     {
-        _auth = auth;
-        _session = session;
-        _audit = audit;
+        _auth = auth ?? throw new ArgumentNullException(nameof(auth));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        _audit = audit ?? throw new ArgumentNullException(nameof(audit));
 
         InitializeComponent();
 
         Text = "Bảo mật tài khoản";
+        StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(560, 470);
         Size = new Size(560, 470);
         BackColor = ThemeHelper.Background;
@@ -54,9 +55,9 @@ public partial class frmChangePassword : Form
         BuildField("Mật khẩu mới", _next, 170);
         BuildField("Xác nhận mật khẩu mới", _confirm, 245);
 
-        _old.UseSystemPasswordChar =
-            _next.UseSystemPasswordChar =
-            _confirm.UseSystemPasswordChar = true;
+        _old.UseSystemPasswordChar = true;
+        _next.UseSystemPasswordChar = true;
+        _confirm.UseSystemPasswordChar = true;
 
         var save = new Button
         {
@@ -77,6 +78,9 @@ public partial class frmChangePassword : Form
         cancel.Click += (_, _) => Close();
 
         Controls.AddRange([save, cancel]);
+
+        AcceptButton = save;
+        CancelButton = cancel;
 
         ThemeHelper.Apply(this);
     }
@@ -111,6 +115,16 @@ public partial class frmChangePassword : Form
                 return;
             }
 
+            if (string.IsNullOrWhiteSpace(_old.Text) ||
+                string.IsNullOrWhiteSpace(_next.Text) ||
+                string.IsNullOrWhiteSpace(_confirm.Text))
+            {
+                MessageHelper.Warning(
+                    "Vui lòng nhập đầy đủ thông tin.");
+
+                return;
+            }
+
             if (_next.Text != _confirm.Text)
             {
                 MessageHelper.Warning(
@@ -119,16 +133,18 @@ public partial class frmChangePassword : Form
                 return;
             }
 
-            if (!_auth.ChangePassword(
-                    _session.User.Id,
-                    _old.Text,
-                    _next.Text))
+            if (_old.Text == _next.Text)
             {
                 MessageHelper.Warning(
-                    "Mật khẩu hiện tại không chính xác.");
+                    "Mật khẩu mới phải khác mật khẩu hiện tại.");
 
                 return;
             }
+
+            _auth.ChangePassword(
+                _session.User.Id,
+                _old.Text,
+                _next.Text);
 
             _audit.Log(
                 "CHANGE_PASSWORD",
@@ -138,6 +154,10 @@ public partial class frmChangePassword : Form
                 "Đổi mật khẩu thành công.");
 
             Close();
+        }
+        catch (BusinessException ex)
+        {
+            MessageHelper.Warning(ex.Message);
         }
         catch (Exception ex)
         {

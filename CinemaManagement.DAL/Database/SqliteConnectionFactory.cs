@@ -1,4 +1,4 @@
-﻿
+
 using Microsoft.Data.Sqlite;
 using CinemaManagement.Core.Constants;
 
@@ -21,7 +21,12 @@ public sealed class SqliteConnectionFactory
         DatabasePath = Path.GetFullPath(
             databasePath ?? Path.Combine(root, AppConstants.DatabaseFileName));
 
-        Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath)!);
+        var directory = Path.GetDirectoryName(DatabasePath);
+
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
     }
 
     private SqliteConnectionFactory(string connectionString, bool isConnectionString)
@@ -33,9 +38,11 @@ public sealed class SqliteConnectionFactory
     public static SqliteConnectionFactory FromConnectionString(string connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
+        {
             throw new ArgumentException(
                 "Connection string không được để trống.",
                 nameof(connectionString));
+        }
 
         return new SqliteConnectionFactory(connectionString, true);
     }

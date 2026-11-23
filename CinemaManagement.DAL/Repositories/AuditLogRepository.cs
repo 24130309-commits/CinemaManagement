@@ -1,4 +1,4 @@
-﻿
+
 using Dapper;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Interfaces;
@@ -16,20 +16,7 @@ public sealed class AuditLogRepository
 
     public void Add(AuditLog log)
     {
-        ArgumentNullException.ThrowIfNull(log);
-
-        using var connection = ConnectionFactory.CreateConnection();
-
-        connection.Execute(
-            @"INSERT INTO AuditLogs(UserId, Action, Detail, CreatedAt)
-              VALUES (@UserId, @Action, @Detail, @CreatedAt)",
-            new
-            {
-                log.UserId,
-                log.Action,
-                log.Detail,
-                CreatedAt = log.CreatedAt.ToString("O")
-            });
+        Insert(log);
     }
 
     public override int Insert(AuditLog log)
@@ -39,13 +26,17 @@ public sealed class AuditLogRepository
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.ExecuteScalar<int>(
-            @"INSERT INTO AuditLogs(UserId, Action, Detail, CreatedAt)
-              VALUES (@UserId, @Action, @Detail, @CreatedAt);
+            @"INSERT INTO AuditLogs
+                (UserId, Action, EntityName, EntityId, Detail, CreatedAt)
+              VALUES
+                (@UserId, @Action, @EntityName, @EntityId, @Detail, @CreatedAt);
               SELECT last_insert_rowid();",
             new
             {
                 log.UserId,
                 log.Action,
+                log.EntityName,
+                log.EntityId,
                 log.Detail,
                 CreatedAt = log.CreatedAt.ToString("O")
             });
@@ -59,12 +50,21 @@ public sealed class AuditLogRepository
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Query<AuditLog>(
-            @"SELECT Id, UserId, Action, Detail, CreatedAt
-              FROM AuditLogs
-              WHERE (@userId = 0 OR UserId = @userId)
-                AND datetime(CreatedAt) >= datetime(@from)
-                AND datetime(CreatedAt) < datetime(@to)
-              ORDER BY CreatedAt DESC",
+            @"SELECT
+                a.Id,
+                a.UserId,
+                COALESCE(u.Username, 'System') AS Username,
+                a.Action,
+                a.EntityName,
+                a.EntityId,
+                a.Detail,
+                a.CreatedAt
+              FROM AuditLogs a
+              LEFT JOIN Users u ON a.UserId = u.Id
+              WHERE (@userId = 0 OR a.UserId = @userId)
+                AND datetime(a.CreatedAt) >= datetime(@from)
+                AND datetime(a.CreatedAt) < datetime(@to)
+              ORDER BY a.CreatedAt DESC",
             new
             {
                 userId,
@@ -81,9 +81,18 @@ public sealed class AuditLogRepository
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Query<AuditLog>(
-            @"SELECT Id, UserId, Action, Detail, CreatedAt
-              FROM AuditLogs
-              ORDER BY Id DESC
+            @"SELECT
+                a.Id,
+                a.UserId,
+                COALESCE(u.Username, 'System') AS Username,
+                a.Action,
+                a.EntityName,
+                a.EntityId,
+                a.Detail,
+                a.CreatedAt
+              FROM AuditLogs a
+              LEFT JOIN Users u ON a.UserId = u.Id
+              ORDER BY a.Id DESC
               LIMIT @limit",
             new { limit }).AsList();
     }

@@ -1,4 +1,5 @@
-﻿﻿using System.Collections;
+
+using System.Collections;
 using System.Globalization;
 using CinemaManagement.Core.DTOs;
 using CinemaManagement.Core.Interfaces;
@@ -10,6 +11,7 @@ namespace CinemaManagement.UI.Forms.Main;
 public partial class frmDashboard : Form
 {
     private readonly IReportService _reports;
+    private readonly IAuditService _auditService;
 
     private readonly FlowLayoutPanel _cards = new()
     {
@@ -29,26 +31,42 @@ public partial class frmDashboard : Form
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
-        AutoGenerateColumns = true
+        AutoGenerateColumns = true,
+        AllowUserToAddRows = false
     };
 
     private readonly DataGridView _upcoming = new()
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
-        AutoGenerateColumns = true
+        AutoGenerateColumns = true,
+        AllowUserToAddRows = false
     };
 
-    public frmDashboard(IReportService reports)
+    private readonly DataGridView _recentLogs = new()
     {
-        _reports = reports;
+        Dock = DockStyle.Fill,
+        ReadOnly = true,
+        AutoGenerateColumns = true,
+        AutoSizeColumnsMode =
+            DataGridViewAutoSizeColumnsMode.Fill,
+        AllowUserToAddRows = false
+    };
 
-        InitializeComponent();
+    public frmDashboard(
+        IReportService reports,
+        IAuditService auditService)
+    {
+        _reports = reports
+            ?? throw new ArgumentNullException(nameof(reports));
+
+        _auditService = auditService
+            ?? throw new ArgumentNullException(nameof(auditService));
 
         Text = "Bảng điều khiển";
         StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new Size(1050, 680);
-        Size = new Size(1220, 790);
+        MinimumSize = new Size(1050, 760);
+        Size = new Size(1220, 900);
 
         BuildLayout();
 
@@ -78,7 +96,8 @@ public partial class frmDashboard : Form
 
         heading.Controls.Add(new Label
         {
-            Text = "Theo dõi doanh thu, phim nổi bật và lịch chiếu sắp tới của rạp.",
+            Text =
+                "Theo dõi doanh thu, phim nổi bật và lịch chiếu sắp tới của rạp.",
             Dock = DockStyle.Top,
             Height = 24,
             Font = ThemeHelper.SmallFont,
@@ -89,38 +108,88 @@ public partial class frmDashboard : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 3,
+            RowCount = 4,
             Padding = new Padding(16),
             BackColor = ThemeHelper.Background
         };
 
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46));
+        root.ColumnStyles.Add(
+            new ColumnStyle(
+                SizeType.Percent,
+                54));
 
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 132));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 53));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 47));
+        root.ColumnStyles.Add(
+            new ColumnStyle(
+                SizeType.Percent,
+                46));
 
-        root.Controls.Add(_cards, 0, 0);
-        root.SetColumnSpan(_cards, 2);
+        root.RowStyles.Add(
+            new RowStyle(
+                SizeType.Absolute,
+                132));
+
+        root.RowStyles.Add(
+            new RowStyle(
+                SizeType.Percent,
+                35));
+
+        root.RowStyles.Add(
+            new RowStyle(
+                SizeType.Percent,
+                35));
+
+        root.RowStyles.Add(
+            new RowStyle(
+                SizeType.Percent,
+                30));
 
         root.Controls.Add(
-            CreateSection("BIỂU ĐỒ DOANH THU", _chart),
+            _cards,
+            0,
+            0);
+
+        root.SetColumnSpan(
+            _cards,
+            2);
+
+        root.Controls.Add(
+            CreateSection(
+                "BIỂU ĐỒ DOANH THU",
+                _chart),
             0,
             1);
 
         root.Controls.Add(
-            CreateSection("TOP PHIM THEO DOANH THU", _topMovies),
+            CreateSection(
+                "TOP PHIM THEO DOANH THU",
+                _topMovies),
             1,
             1);
 
+        var upcomingSection = CreateSection(
+            "CÁC SUẤT CHIẾU SẮP TỚI",
+            _upcoming);
+
         root.Controls.Add(
-            CreateSection("CÁC SUẤT CHIẾU SẮP TỚI", _upcoming),
+            upcomingSection,
             0,
             2);
 
         root.SetColumnSpan(
-            root.GetControlFromPosition(0, 2)!,
+            upcomingSection,
+            2);
+
+        var recentLogsSection = CreateSection(
+            "NHẬT KÝ HOẠT ĐỘNG GẦN ĐÂY",
+            _recentLogs);
+
+        root.Controls.Add(
+            recentLogsSection,
+            0,
+            3);
+
+        root.SetColumnSpan(
+            recentLogsSection,
             2);
 
         Controls.Add(root);
@@ -163,79 +232,124 @@ public partial class frmDashboard : Form
     {
         try
         {
-            dynamic stats = _reports.GetDashboardStats();
+            dynamic stats =
+                _reports.GetDashboardStats();
 
             _cards.Controls.Clear();
 
-            _cards.Controls.Add(new StatCard(
-                "Vé bán hôm nay",
-                Convert.ToString(stats.TicketsToday) ?? "0",
-                "▣"));
+            _cards.Controls.Add(
+                new StatCard(
+                    "Vé bán hôm nay",
+                    Convert.ToString(
+                        stats.TicketsToday) ?? "0",
+                    "▣"));
 
-            _cards.Controls.Add(new StatCard(
-                "Doanh thu hôm nay",
-                string.Format("{0:N0} đ", stats.RevenueToday),
-                "₫"));
+            _cards.Controls.Add(
+                new StatCard(
+                    "Doanh thu hôm nay",
+                    string.Format(
+                        "{0:N0} đ",
+                        stats.RevenueToday),
+                    "₫"));
 
-            _cards.Controls.Add(new StatCard(
-                "Doanh thu 7 ngày",
-                string.Format("{0:N0} đ", stats.RevenueLast7Days),
-                "↗"));
+            _cards.Controls.Add(
+                new StatCard(
+                    "Doanh thu 7 ngày",
+                    string.Format(
+                        "{0:N0} đ",
+                        stats.RevenueLast7Days),
+                    "↗"));
 
-            _cards.Controls.Add(new StatCard(
-                "Doanh thu 30 ngày",
-                string.Format("{0:N0} đ", stats.RevenueLast30Days),
-                "▤"));
+            _cards.Controls.Add(
+                new StatCard(
+                    "Doanh thu 30 ngày",
+                    string.Format(
+                        "{0:N0} đ",
+                        stats.RevenueLast30Days),
+                    "▤"));
 
             _topMovies.DataSource =
-                ((IEnumerable<RevenueByMovieDto>)stats.TopMovies).ToList();
+                ((IEnumerable<RevenueByMovieDto>)
+                    stats.TopMovies)
+                .ToList();
 
             ConfigureTopMovieColumns();
 
-            var trend = new List<(string Label, decimal Value)>();
+            var trend =
+                new List<(string Label, decimal Value)>();
 
-            foreach (var row in (IEnumerable)stats.RevenueTrend)
+            foreach (var row
+                     in (IEnumerable)stats.RevenueTrend)
             {
                 if (row is not IDictionary<string, object> values)
                     continue;
 
-                var rawDate = Convert.ToString(
-                    values["RevenueDate"],
-                    CultureInfo.InvariantCulture) ?? string.Empty;
+                var rawDate =
+                    Convert.ToString(
+                        values["RevenueDate"],
+                        CultureInfo.InvariantCulture)
+                    ?? string.Empty;
 
-                var amount = Convert.ToDecimal(
-                    values["Revenue"],
-                    CultureInfo.InvariantCulture);
+                var amount =
+                    Convert.ToDecimal(
+                        values["Revenue"],
+                        CultureInfo.InvariantCulture);
 
-                var label = DateTime.TryParse(rawDate, out var date)
-                    ? date.ToString("dd/MM")
-                    : rawDate;
+                var label =
+                    DateTime.TryParse(
+                        rawDate,
+                        out var date)
+                        ? date.ToString("dd/MM")
+                        : rawDate;
 
-                trend.Add((label, amount));
+                trend.Add(
+                    (label, amount));
             }
 
             _chart.Points = trend;
 
-            var upcomingRows = new List<UpcomingShowtimeRow>();
+            var upcomingRows =
+                new List<UpcomingShowtimeRow>();
 
-            foreach (var row in (IEnumerable)stats.UpcomingShowtimes)
+            foreach (var row
+                     in (IEnumerable)stats.UpcomingShowtimes)
             {
-                if (row is IDictionary<string, object> values)
-                {
-                    upcomingRows.Add(new UpcomingShowtimeRow(
-                        Convert.ToInt32(values["ShowtimeId"]),
-                        Convert.ToString(values["MovieTitle"]) ?? string.Empty,
-                        Convert.ToString(values["RoomName"]) ?? string.Empty,
+                if (row is not IDictionary<string, object> values)
+                    continue;
+
+                upcomingRows.Add(
+                    new UpcomingShowtimeRow(
+                        Convert.ToInt32(
+                            values["ShowtimeId"]),
+
+                        Convert.ToString(
+                            values["MovieTitle"])
+                        ?? string.Empty,
+
+                        Convert.ToString(
+                            values["RoomName"])
+                        ?? string.Empty,
+
                         DateTime.Parse(
-                            Convert.ToString(values["StartTime"])
+                            Convert.ToString(
+                                values["StartTime"])
                             ?? DateTime.Now.ToString("O")),
-                        Convert.ToInt32(values["SeatsLeft"])));
-                }
+
+                        Convert.ToInt32(
+                            values["SeatsLeft"])));
             }
 
-            _upcoming.DataSource = upcomingRows;
+            _upcoming.DataSource =
+                upcomingRows;
 
             ConfigureUpcomingColumns();
+
+            _recentLogs.DataSource =
+                _auditService
+                    .GetRecentLogs(50)
+                    .ToList();
+
+            ConfigureRecentLogColumns();
         }
         catch (Exception ex)
         {
@@ -310,6 +424,40 @@ public partial class frmDashboard : Form
             "Ghế còn");
     }
 
+    private void ConfigureRecentLogColumns()
+    {
+        SetColumn(
+            _recentLogs,
+            "Id",
+            "Mã nhật ký");
+
+        SetColumn(
+            _recentLogs,
+            "Username",
+            "Người thực hiện");
+
+        SetColumn(
+            _recentLogs,
+            "Action",
+            "Hoạt động");
+
+        SetColumn(
+            _recentLogs,
+            "EntityName",
+            "Đối tượng");
+
+        SetColumn(
+            _recentLogs,
+            "Detail",
+            "Chi tiết");
+
+        SetColumn(
+            _recentLogs,
+            "CreatedAt",
+            "Thời gian",
+            format: "dd/MM/yyyy HH:mm");
+    }
+
     private static void SetColumn(
         DataGridView grid,
         string name,
@@ -320,7 +468,10 @@ public partial class frmDashboard : Form
         if (!grid.Columns.Contains(name))
             return;
 
-        var column = grid.Columns[name]!;
+        var column = grid.Columns[name];
+
+        if (column is null)
+            return;
 
         column.HeaderText = header;
         column.Visible = visible;

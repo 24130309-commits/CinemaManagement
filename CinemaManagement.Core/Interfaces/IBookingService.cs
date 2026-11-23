@@ -13,5 +13,6 @@ public interface IBookingService
         PaymentMethod paymentMethod);
 
     List<Booking> GetBookingHistory(int customerId);
+
     Booking? GetBookingDetails(int bookingId);
 }

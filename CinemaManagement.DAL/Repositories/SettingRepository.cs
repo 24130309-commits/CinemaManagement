@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Interfaces;
 using CinemaManagement.DAL.Database;

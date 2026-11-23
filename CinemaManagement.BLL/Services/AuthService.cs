@@ -1,7 +1,8 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using CinemaManagement.BLL.Session;
 using CinemaManagement.BLL.Validators;
 using CinemaManagement.Core.Constants;
+using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Exceptions;
 using CinemaManagement.Core.Interfaces;
 
@@ -14,6 +15,7 @@ public sealed class AuthService : IAuthService
     private readonly IUserRepository _users;
     private readonly CurrentUserSession _session;
     private readonly UserValidator _validator;
+    private readonly IAuditService? _audit;
 
     private readonly ConcurrentDictionary<string, LoginFailure> _failures =
         new(StringComparer.OrdinalIgnoreCase);
@@ -21,26 +23,33 @@ public sealed class AuthService : IAuthService
     public AuthService(
         IUserRepository users,
         CurrentUserSession session,
-        UserValidator validator)
+        UserValidator validator,
+        IAuditService? audit = null)
     {
         _users = users;
         _session = session;
         _validator = validator;
+        _audit = audit;
     }
 
-    public bool Login(string username, string password)
+    public User Login(string username, string password)
     {
         if (string.IsNullOrWhiteSpace(username) ||
             string.IsNullOrEmpty(password))
-            return false;
+        {
+            throw new BusinessException(
+                "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.");
+        }
 
         var key = username.Trim();
 
-        if (_failures.TryGetValue(key, out var state) &&
-            state.LockedUntil > DateTime.Now)
+        _failures.TryGetValue(key, out var state);
+
+        if (state?.LockedUntil is DateTime lockedUntil &&
+            lockedUntil > DateTime.Now)
         {
             throw new BusinessException(
-                $"Tài khoản tạm khóa đến {state.LockedUntil:HH:mm:ss} do đăng nhập sai nhiều lần.");
+                $"Tài khoản tạm khóa đến {lockedUntil:HH:mm:ss} do đăng nhập sai nhiều lần.");
         }
 
         var user = _users.GetByUsername(key);
@@ -49,47 +58,84 @@ public sealed class AuthService : IAuthService
             !user.IsActive ||
             !VerifyPassword(password, user.PasswordHash))
         {
-            var count = (state?.Count ?? 0) + 1;
+            var count = state?.LockedUntil.HasValue == true
+                ? 1
+                : (state?.Count ?? 0) + 1;
 
-            DateTime? lockedUntil =
+            DateTime? newLockedUntil =
                 count >= AppConstants.MaxFailedLoginAttempts
-                    ? DateTime.Now.AddMinutes(AppConstants.LoginLockoutMinutes)
+                    ? DateTime.Now.AddMinutes(
+                        AppConstants.LoginLockoutMinutes)
                     : null;
 
             _failures[key] = new LoginFailure(
-                lockedUntil is null ? count : 0,
-                lockedUntil);
+                newLockedUntil.HasValue ? 0 : count,
+                newLockedUntil);
 
-            if (lockedUntil.HasValue)
+            if (newLockedUntil.HasValue)
             {
                 throw new BusinessException(
-                    $"Bạn đã nhập sai {AppConstants.MaxFailedLoginAttempts} lần. Tài khoản tạm khóa {AppConstants.LoginLockoutMinutes} phút.");
+                    $"Bạn đã nhập sai {AppConstants.MaxFailedLoginAttempts} lần. " +
+                    $"Tài khoản tạm khóa {AppConstants.LoginLockoutMinutes} phút.");
             }
 
-            return false;
+            throw new BusinessException(
+                "Tên đăng nhập hoặc mật khẩu không chính xác.");
         }
 
         _failures.TryRemove(key, out _);
+
         _session.Set(user);
 
-        return true;
+        _audit?.Log(
+            "LOGIN",
+            "User",
+            user.Id,
+            $"Người dùng {user.Username} đăng nhập hệ thống.");
+
+        return user;
     }
 
     public void Logout()
     {
+        var user = _session.User;
+
+        if (user is not null)
+        {
+            _audit?.Log(
+                "LOGOUT",
+                "User",
+                user.Id,
+                $"Người dùng {user.Username} đăng xuất.");
+        }
+
         _session.Clear();
     }
 
-    public bool ChangePassword(
+    public void ChangePassword(
         int userId,
         string oldPassword,
         string newPassword)
     {
+        if (string.IsNullOrWhiteSpace(oldPassword))
+        {
+            throw new BusinessException(
+                "Vui lòng nhập mật khẩu hiện tại.");
+        }
+
         var user = _users.GetById(userId);
 
-        if (user is null ||
-            !VerifyPassword(oldPassword, user.PasswordHash))
-            return false;
+        if (user is null)
+        {
+            throw new BusinessException(
+                "Không tìm thấy tài khoản.");
+        }
+
+        if (!VerifyPassword(oldPassword, user.PasswordHash))
+        {
+            throw new BusinessException(
+                "Mật khẩu hiện tại không đúng.");
+        }
 
         _validator.ValidatePassword(newPassword);
 
@@ -99,9 +145,15 @@ public sealed class AuthService : IAuthService
                 "Mật khẩu mới phải khác mật khẩu hiện tại.");
         }
 
-        return _users.UpdatePassword(
+        var updated = _users.UpdatePassword(
             userId,
             HashPassword(newPassword));
+
+        if (!updated)
+        {
+            throw new BusinessException(
+                "Không thể cập nhật mật khẩu. Vui lòng thử lại.");
+        }
     }
 
     public string HashPassword(string password)
@@ -117,11 +169,15 @@ public sealed class AuthService : IAuthService
     {
         if (string.IsNullOrEmpty(password) ||
             string.IsNullOrEmpty(hash))
+        {
             return false;
+        }
 
         try
         {
-            return global::BCrypt.Net.BCrypt.Verify(password, hash);
+            return global::BCrypt.Net.BCrypt.Verify(
+                password,
+                hash);
         }
         catch (Exception)
         {

@@ -1,4 +1,8 @@
-﻿namespace CinemaManagement.UI.Helpers;
+﻿using System;
+using System.Windows.Forms;
+using CinemaManagement.Core.Exceptions;
+
+namespace CinemaManagement.UI.Helpers;
 
 public static class MessageHelper
 {
@@ -48,9 +52,32 @@ public static class MessageHelper
 
     public static void Handle(Exception exception)
     {
-        if (exception is CinemaManagement.Core.Exceptions.BusinessException)
+        if (exception is BusinessException)
             Warning(exception.Message);
         else
-            Error("Đã xảy ra lỗi. Vui lòng thử lại.\n" + exception.Message);
+            Error(
+                "Đã xảy ra lỗi. Vui lòng thử lại.\n" +
+                exception.Message);
+    }
+
+    public static void ShowInfo(
+        string message,
+        string title = "Thông báo")
+    {
+        Info(message, title);
+    }
+
+    public static void ShowWarning(
+        string message,
+        string title = "Cảnh báo")
+    {
+        Warning(message, title);
+    }
+
+    public static void ShowError(
+        string message,
+        string title = "Lỗi")
+    {
+        Error(message, title);
     }
 }

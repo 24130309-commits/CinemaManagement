@@ -1,4 +1,9 @@
-﻿
+
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
 using CinemaManagement.Core.DTOs;
 using CinemaManagement.Core.Interfaces;
 using CinemaManagement.UI.Helpers;
@@ -32,6 +37,8 @@ public partial class frmOccupancyReport : Form
         AutoGenerateColumns = true,
         AllowUserToAddRows = false,
         AllowUserToDeleteRows = false,
+        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+        MultiSelect = false,
         AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
     };
 
@@ -47,16 +54,15 @@ public partial class frmOccupancyReport : Form
     };
 
     private List<OccupancyDto> _data = [];
-    private List<OccupancyReportRow> _reportRows = [];
 
     public frmOccupancyReport(
         IReportService reports,
         IExportService export,
         IAuditService audit)
     {
-        _reports = reports;
-        _export = export;
-        _audit = audit;
+        _reports = reports ?? throw new ArgumentNullException(nameof(reports));
+        _export = export ?? throw new ArgumentNullException(nameof(export));
+        _audit = audit ?? throw new ArgumentNullException(nameof(audit));
 
         InitializeComponent();
 
@@ -139,27 +145,17 @@ public partial class frmOccupancyReport : Form
 
         loadButton.Click += (_, _) => LoadData();
 
-        var excelButton = new Button
+        var exportButton = new Button
         {
-            Text = "Xuất Excel",
+            Text = "Xuất CSV",
             AutoSize = true,
             Height = 34
         };
 
-        excelButton.Click += (_, _) => Export(true);
-
-        var pdfButton = new Button
-        {
-            Text = "Xuất PDF",
-            AutoSize = true,
-            Height = 34
-        };
-
-        pdfButton.Click += (_, _) => Export(false);
+        exportButton.Click += (_, _) => Export();
 
         toolbar.Controls.Add(loadButton);
-        toolbar.Controls.Add(excelButton);
-        toolbar.Controls.Add(pdfButton);
+        toolbar.Controls.Add(exportButton);
 
         var content = new Panel
         {
@@ -196,37 +192,12 @@ public partial class frmOccupancyReport : Form
                 return;
             }
 
-            _data = _reports.GetOccupancy(
+            _data = _reports.GetOccupancyReport(
                 _from.Value.Date,
-                _to.Value.Date).ToList();
-
-            _reportRows = _data.Select(x =>
-            {
-                double rate = x.TotalSeats > 0
-                    ? (double)x.SoldSeats / x.TotalSeats * 100
-                    : 0;
-
-                string status =
-                    x.TotalSeats > 0 &&
-                    x.SoldSeats >= x.TotalSeats
-                        ? "Cháy vé"
-                        : rate < 20
-                            ? "Vắng khách"
-                            : "Bình thường";
-
-                return new OccupancyReportRow(
-                    x.ShowtimeId,
-                    x.MovieTitle,
-                    x.Date,
-                    x.TotalSeats,
-                    x.SoldSeats,
-                    rate,
-                    status
-                );
-            }).ToList();
+                _to.Value.Date.AddDays(1).AddTicks(-1)).ToList();
 
             _grid.DataSource = null;
-            _grid.DataSource = _reportRows;
+            _grid.DataSource = _data;
 
             ConfigureColumns();
             UpdateSummary();
@@ -239,37 +210,32 @@ public partial class frmOccupancyReport : Form
 
     private void ConfigureColumns()
     {
-        SetColumn(
-            nameof(OccupancyReportRow.ShowtimeId),
-            "Mã suất chiếu");
+        SetColumn(nameof(OccupancyDto.ShowtimeId), "Mã suất chiếu");
+        SetColumn(nameof(OccupancyDto.MovieTitle), "Tên phim");
+        SetColumn(nameof(OccupancyDto.Date), "Ngày chiếu", "dd/MM/yyyy");
+        SetColumn(nameof(OccupancyDto.StartTime), "Giờ bắt đầu");
+        SetColumn(nameof(OccupancyDto.TotalSeats), "Tổng số ghế", "N0");
+        SetColumn(nameof(OccupancyDto.SoldSeats), "Ghế đã bán", "N0");
+        SetColumn(nameof(OccupancyDto.OccupancyRate), "Tỷ lệ lấp đầy (%)", "N1");
+        SetColumn(nameof(OccupancyDto.TotalPrice), "Doanh thu", "N0");
 
-        SetColumn(
-            nameof(OccupancyReportRow.MovieTitle),
-            "Tên phim");
+        if (!_grid.Columns.Contains("StatusLabel"))
+        {
+            _grid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "StatusLabel",
+                HeaderText = "Trạng thái",
+                ReadOnly = true
+            });
+        }
 
-        SetColumn(
-            nameof(OccupancyReportRow.StartTime),
-            "Ngày chiếu",
-            "dd/MM/yyyy HH:mm");
-
-        SetColumn(
-            nameof(OccupancyReportRow.TotalSeats),
-            "Tổng số ghế",
-            "N0");
-
-        SetColumn(
-            nameof(OccupancyReportRow.SoldSeats),
-            "Ghế đã bán",
-            "N0");
-
-        SetColumn(
-            nameof(OccupancyReportRow.OccupancyRate),
-            "Tỷ lệ lấp đầy (%)",
-            "N1");
-
-        SetColumn(
-            nameof(OccupancyReportRow.StatusLabel),
-            "Trạng thái");
+        foreach (DataGridViewRow row in _grid.Rows)
+        {
+            if (row.DataBoundItem is OccupancyDto item)
+            {
+                row.Cells["StatusLabel"].Value = GetStatus(item);
+            }
+        }
     }
 
     private void SetColumn(
@@ -288,85 +254,85 @@ public partial class frmOccupancyReport : Form
             column.DefaultCellStyle.Format = format;
     }
 
+    private static string GetStatus(OccupancyDto item)
+    {
+        if (item.TotalSeats > 0 &&
+            item.SoldSeats >= item.TotalSeats)
+        {
+            return "Cháy vé";
+        }
+
+        return item.OccupancyRate < 20
+            ? "Vắng khách"
+            : "Bình thường";
+    }
+
     private void Grid_CellFormatting(
         object? sender,
         DataGridViewCellFormattingEventArgs e)
     {
         if (e.RowIndex < 0 ||
             e.ColumnIndex < 0 ||
-            e.ColumnIndex >= _grid.Columns.Count)
-        {
-            return;
-        }
-
-        if (_grid.Columns[e.ColumnIndex].Name !=
-            nameof(OccupancyReportRow.StatusLabel))
+            _grid.Columns[e.ColumnIndex].Name != "StatusLabel")
         {
             return;
         }
 
         var status = Convert.ToString(e.Value);
 
-        if (status == "Cháy vé")
+        e.CellStyle.ForeColor = status switch
         {
-            e.CellStyle.ForeColor = ThemeHelper.Success;
-        }
-        else if (status == "Vắng khách")
-        {
-            e.CellStyle.ForeColor = ThemeHelper.Danger;
-        }
-        else
-        {
-            e.CellStyle.ForeColor = ThemeHelper.Muted;
-        }
+            "Cháy vé" => ThemeHelper.Success,
+            "Vắng khách" => ThemeHelper.Danger,
+            _ => ThemeHelper.Muted
+        };
 
-        e.CellStyle.Font =
-            new Font("Segoe UI", 9f, FontStyle.Bold);
+        e.CellStyle.Font = new Font(
+            "Segoe UI",
+            9f,
+            FontStyle.Bold);
     }
 
     private void UpdateSummary()
     {
-        if (_reportRows.Count == 0)
+        if (_data.Count == 0)
         {
-            _summary.Text = "  Không có dữ liệu trong khoảng thời gian đã chọn.";
+            _summary.Text =
+                "  Không có dữ liệu trong khoảng thời gian đã chọn.";
+
             return;
         }
 
-        int totalSeats = _reportRows.Sum(x => x.TotalSeats);
-        int soldSeats = _reportRows.Sum(x => x.SoldSeats);
+        int totalSeats = _data.Sum(x => x.TotalSeats);
+        int soldSeats = _data.Sum(x => x.SoldSeats);
 
         double overallRate = totalSeats > 0
             ? (double)soldSeats / totalSeats * 100
             : 0;
 
-        int soldOut = _reportRows.Count(
-            x => x.StatusLabel == "Cháy vé");
+        int soldOut = _data.Count(
+            x => x.TotalSeats > 0 &&
+                 x.SoldSeats >= x.TotalSeats);
 
         _summary.Text =
-            $"  Tổng suất: {_reportRows.Count:N0}     " +
+            $"  Tổng suất: {_data.Count:N0}     " +
             $"Ghế đã bán: {soldSeats:N0}/{totalSeats:N0}     " +
             $"Tỷ lệ lấp đầy chung: {overallRate:N1}%     " +
             $"Suất cháy vé: {soldOut:N0}";
     }
 
-    private void Export(bool excel)
+    private void Export()
     {
-        if (_reportRows.Count == 0)
+        if (_data.Count == 0)
         {
-            MessageHelper.Warning(
-                "Không có dữ liệu để xuất.");
-
+            MessageHelper.Warning("Không có dữ liệu để xuất.");
             return;
         }
 
         using var dialog = new SaveFileDialog
         {
-            Filter = excel
-                ? "Excel (*.xlsx)|*.xlsx"
-                : "PDF (*.pdf)|*.pdf",
-
-            FileName =
-                $"BaoCaoLapDay_{DateTime.Now:yyyyMMdd}"
+            Filter = "CSV (*.csv)|*.csv",
+            FileName = $"BaoCaoLapDay_{DateTime.Now:yyyyMMdd}.csv"
         };
 
         if (dialog.ShowDialog() != DialogResult.OK)
@@ -374,38 +340,17 @@ public partial class frmOccupancyReport : Form
 
         try
         {
-            if (excel)
-            {
-                _export.ExportToExcel(
-                    _reportRows,
-                    dialog.FileName);
-            }
-            else
-            {
-                _export.ExportToPdf(
-                    _reportRows,
-                    dialog.FileName);
-            }
+            _export.ExportToCsv(_data, dialog.FileName);
 
             _audit.Log(
                 "OCCUPANCY_REPORT_EXPORT",
-                "Xuất báo cáo occupancy thành công.");
+                "Xuất báo cáo tỷ lệ lấp đầy dạng CSV.");
 
-            MessageHelper.Info(
-                "Xuất báo cáo thành công.");
+            MessageHelper.Info("Xuất báo cáo thành công.");
         }
         catch (Exception ex)
         {
             MessageHelper.Handle(ex);
         }
     }
-
-    private sealed record OccupancyReportRow(
-        int ShowtimeId,
-        string MovieTitle,
-        DateTime StartTime,
-        int TotalSeats,
-        int SoldSeats,
-        double OccupancyRate,
-        string StatusLabel);
 }

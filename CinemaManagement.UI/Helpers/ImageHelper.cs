@@ -1,4 +1,8 @@
-﻿using System.Drawing.Drawing2D;
+
+using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.IO;
 using CinemaManagement.Core.Constants;
 
 namespace CinemaManagement.UI.Helpers;
@@ -10,9 +14,11 @@ public static class ImageHelper
         string? posterDirectory = null)
     {
         if (!File.Exists(sourcePath))
+        {
             throw new FileNotFoundException(
                 "Không tìm thấy ảnh áp phích.",
                 sourcePath);
+        }
 
         var directory = Path.GetFullPath(
             posterDirectory ??
@@ -27,8 +33,10 @@ public static class ImageHelper
         var extension = Path.GetExtension(sourcePath).ToLowerInvariant();
 
         if (extension is not ".jpg" and not ".jpeg" and not ".png")
+        {
             throw new InvalidOperationException(
                 "Chỉ hỗ trợ ảnh JPG hoặc PNG.");
+        }
 
         var destination = Path.Combine(
             directory,
@@ -56,11 +64,21 @@ public static class ImageHelper
         return new Bitmap(image);
     }
 
+    public static Image? LoadSafe(string? path)
+    {
+        return LoadUnlocked(path);
+    }
+
     public static Image? CreateThumbnail(
         string? path,
         int width,
         int height)
     {
+        if (width <= 0 || height <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(width),
+                "Kích thước ảnh phải lớn hơn 0.");
+
         using var source = LoadUnlocked(path);
 
         if (source is null)

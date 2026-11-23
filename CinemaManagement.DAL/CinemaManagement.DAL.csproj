@@ -1,5 +1,4 @@
-﻿
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
@@ -12,9 +11,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+        <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
         <PackageReference Include="Dapper" Version="2.1.66" />
-        <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+        <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.23" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,4 +1,4 @@
-﻿
+
 using Dapper;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Interfaces;
@@ -16,13 +16,15 @@ public sealed class PromotionRepository
 
     public override int Insert(Promotion entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         const string sql = """
             INSERT INTO Promotions
-                (Code, Type, Value, StartDate, EndDate,
-                 MinOrder, UsageLimit, UsedCount)
+                (Code, Description, Type, Value, MaxDiscountAmount,
+                 StartDate, EndDate, MinOrder, UsageLimit, UsedCount, IsActive)
             VALUES
-                (@Code, @Type, @Value, @StartDate, @EndDate,
-                 @MinOrder, @UsageLimit, @UsedCount);
+                (@Code, @Description, @Type, @Value, @MaxDiscountAmount,
+                 @StartDate, @EndDate, @MinOrder, @UsageLimit, @UsedCount, @IsActive);
 
             SELECT last_insert_rowid();
             """;
@@ -32,28 +34,36 @@ public sealed class PromotionRepository
         return connection.ExecuteScalar<int>(sql, new
         {
             entity.Code,
+            entity.Description,
             entity.Type,
             entity.Value,
-            StartDate = entity.StartDate.ToString("yyyy-MM-dd HH:mm:ss"),
-            EndDate = entity.EndDate.ToString("yyyy-MM-dd HH:mm:ss"),
+            entity.MaxDiscountAmount,
+            StartDate = entity.StartDate.ToString("O"),
+            EndDate = entity.EndDate.ToString("O"),
             entity.MinOrder,
             entity.UsageLimit,
-            entity.UsedCount
+            entity.UsedCount,
+            entity.IsActive
         });
     }
 
     public override bool Update(Promotion entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         const string sql = """
             UPDATE Promotions
             SET Code = @Code,
+                Description = @Description,
                 Type = @Type,
                 Value = @Value,
+                MaxDiscountAmount = @MaxDiscountAmount,
                 StartDate = @StartDate,
                 EndDate = @EndDate,
                 MinOrder = @MinOrder,
                 UsageLimit = @UsageLimit,
-                UsedCount = @UsedCount
+                UsedCount = @UsedCount,
+                IsActive = @IsActive
             WHERE Id = @Id;
             """;
 
@@ -63,13 +73,16 @@ public sealed class PromotionRepository
         {
             entity.Id,
             entity.Code,
+            entity.Description,
             entity.Type,
             entity.Value,
-            StartDate = entity.StartDate.ToString("yyyy-MM-dd HH:mm:ss"),
-            EndDate = entity.EndDate.ToString("yyyy-MM-dd HH:mm:ss"),
+            entity.MaxDiscountAmount,
+            StartDate = entity.StartDate.ToString("O"),
+            EndDate = entity.EndDate.ToString("O"),
             entity.MinOrder,
             entity.UsageLimit,
-            entity.UsedCount
+            entity.UsedCount,
+            entity.IsActive
         }) > 0;
     }
 
@@ -78,34 +91,44 @@ public sealed class PromotionRepository
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Execute(
-            "DELETE FROM Promotions WHERE Id = @id;",
-            new { id }) > 0;
+            "DELETE FROM Promotions WHERE Id = @Id;",
+            new { Id = id }) > 0;
     }
 
     public Promotion? GetByCode(string code)
     {
+        if (string.IsNullOrWhiteSpace(code))
+            return null;
+
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.QuerySingleOrDefault<Promotion>(
             """
             SELECT *
             FROM Promotions
-            WHERE Code = @code COLLATE NOCASE;
+            WHERE Code = @Code COLLATE NOCASE;
             """,
-            new { code = code.Trim() });
+            new { Code = code.Trim() });
     }
 
     public bool IsCodeExists(string code, int? excludeId = null)
     {
+        if (string.IsNullOrWhiteSpace(code))
+            return false;
+
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.ExecuteScalar<int>(
             """
             SELECT COUNT(1)
             FROM Promotions
-            WHERE Code = @code COLLATE NOCASE
-              AND (@excludeId IS NULL OR Id <> @excludeId);
+            WHERE Code = @Code COLLATE NOCASE
+              AND (@ExcludeId IS NULL OR Id <> @ExcludeId);
             """,
-            new { code = code.Trim(), excludeId }) > 0;
+            new
+            {
+                Code = code.Trim(),
+                ExcludeId = excludeId
+            }) > 0;
     }
 }

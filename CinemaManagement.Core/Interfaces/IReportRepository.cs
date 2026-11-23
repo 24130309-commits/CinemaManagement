@@ -4,7 +4,7 @@ using CinemaManagement.Core.DTOs;
 
 namespace CinemaManagement.Core.Interfaces;
 
-public interface IReportRepository
+public partial interface IReportRepository
 {
     IEnumerable<RevenueByMovieDto> RevenueByMovie(DateTime from, DateTime to);
     IEnumerable<OccupancyDto> OccupancyByShowtime(DateTime from, DateTime to);

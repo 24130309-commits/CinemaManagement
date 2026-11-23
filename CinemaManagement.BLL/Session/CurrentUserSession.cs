@@ -1,4 +1,4 @@
-﻿using CinemaManagement.Core.Entities;
+using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Enums;
 
 namespace CinemaManagement.BLL.Session;
@@ -22,7 +22,10 @@ public sealed class CurrentUserSession
         User = user ?? throw new ArgumentNullException(nameof(user));
     }
 
-    public void SetUser(User user) => Set(user);
+    public void SetUser(User user)
+    {
+        Set(user);
+    }
 
     public bool IsInRole(params UserRole[] roles)
     {

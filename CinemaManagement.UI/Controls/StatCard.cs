@@ -1,4 +1,4 @@
-﻿
+
 using System.ComponentModel;
 using CinemaManagement.UI.Helpers;
 
@@ -55,8 +55,8 @@ public sealed class StatCard : UserControl
         _icon.Text = icon;
         _icon.Font = new Font("Segoe UI", 19, FontStyle.Bold);
         _icon.ForeColor = ThemeHelper.Accent;
-        _icon.Location = new Point(Width - 52, 18);
         _icon.AutoSize = true;
+        _icon.Location = new Point(Width - 52, 18);
         _icon.Anchor = AnchorStyles.Top | AnchorStyles.Right;
 
         _title.Text = title;

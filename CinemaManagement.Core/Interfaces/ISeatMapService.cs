@@ -1,4 +1,4 @@
-﻿using CinemaManagement.Core.DTOS;
+﻿using CinemaManagement.Core.DTOs;
 
 namespace CinemaManagement.Core.Interfaces;
 

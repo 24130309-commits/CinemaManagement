@@ -39,67 +39,64 @@ public class AuthServiceTests
     }
 
     [Test]
-    public void Login_WithCorrectCredentials_ReturnsTrue()
+    public void Login_WithCorrectCredentials_ReturnsUser()
     {
         var result = _auth.Login(
             "admin",
             "ValidPass123");
 
-        Assert.That(result, Is.True);
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result.Id, Is.EqualTo(1));
+        Assert.That(result.Username, Is.EqualTo("admin"));
+        Assert.That(result.Role, Is.EqualTo(UserRole.Admin));
         Assert.That(_session.User, Is.Not.Null);
-        Assert.That(_session.User!.Id, Is.EqualTo(1));
-        Assert.That(_session.User.Role, Is.EqualTo(UserRole.Admin));
     }
 
     [Test]
-    public void Login_WithWrongPassword_ReturnsFalse()
+    public void Login_WithWrongPassword_ThrowsBusinessException()
     {
-        var result = _auth.Login(
-            "admin",
-            "WrongPass123");
+        Assert.Throws<BusinessException>(() =>
+            _auth.Login(
+                "admin",
+                "WrongPass123"));
 
-        Assert.That(result, Is.False);
         Assert.That(_session.User, Is.Null);
     }
 
     [Test]
-    public void Login_WithUnknownUsername_ReturnsFalse()
+    public void Login_WithUnknownUsername_ThrowsBusinessException()
     {
-        var result = _auth.Login(
-            "unknown",
-            "ValidPass123");
+        Assert.Throws<BusinessException>(() =>
+            _auth.Login(
+                "unknown",
+                "ValidPass123"));
 
-        Assert.That(result, Is.False);
         Assert.That(_session.User, Is.Null);
     }
 
     [Test]
-    public void Login_WithInactiveAccount_ReturnsFalse()
+    public void Login_WithInactiveAccount_ThrowsBusinessException()
     {
         _users.SetActive(1, false);
 
-        var result = _auth.Login(
-            "admin",
-            "ValidPass123");
+        Assert.Throws<BusinessException>(() =>
+            _auth.Login(
+                "admin",
+                "ValidPass123"));
 
-        Assert.That(result, Is.False);
         Assert.That(_session.User, Is.Null);
     }
 
     [Test]
     public void Login_AfterFiveFailedAttempts_ThrowsBusinessException()
     {
-        for (var i = 0; i < 4; i++)
+        for (var i = 0; i < 5; i++)
         {
-            var result = _auth.Login(
-                "admin",
-                "WrongPass123");
-
-            Assert.That(result, Is.False);
+            Assert.Throws<BusinessException>(() =>
+                _auth.Login(
+                    "admin",
+                    "WrongPass123"));
         }
-
-        Assert.Throws<BusinessException>(() =>
-            _auth.Login("admin", "WrongPass123"));
     }
 
     [Test]
@@ -109,16 +106,19 @@ public class AuthServiceTests
         {
             try
             {
-                _auth.Login("admin", "WrongPass123");
+                _auth.Login(
+                    "admin",
+                    "WrongPass123");
             }
             catch (BusinessException)
             {
-                // Lần nhập sai thứ năm sẽ kích hoạt khóa tạm.
             }
         }
 
         Assert.Throws<BusinessException>(() =>
-            _auth.Login("admin", "ValidPass123"));
+            _auth.Login(
+                "admin",
+                "ValidPass123"));
     }
 
     [Test]
@@ -126,34 +126,38 @@ public class AuthServiceTests
     {
         for (var i = 0; i < 4; i++)
         {
-            Assert.That(
-                _auth.Login("admin", "WrongPass123"),
-                Is.False);
+            Assert.Throws<BusinessException>(() =>
+                _auth.Login(
+                    "admin",
+                    "WrongPass123"));
         }
 
-        Assert.That(
-            _auth.Login("admin", "ValidPass123"),
-            Is.True);
+        var result = _auth.Login(
+            "admin",
+            "ValidPass123");
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result.Id, Is.EqualTo(1));
 
         _auth.Logout();
 
         for (var i = 0; i < 4; i++)
         {
-            Assert.That(
-                _auth.Login("admin", "WrongPass123"),
-                Is.False);
+            Assert.Throws<BusinessException>(() =>
+                _auth.Login(
+                    "admin",
+                    "WrongPass123"));
         }
     }
 
     [Test]
-    public void ChangePassword_WithCorrectOldPassword_ReturnsTrue()
+    public void ChangePassword_WithCorrectOldPassword_UpdatesPassword()
     {
-        var result = _auth.ChangePassword(
-            1,
-            "ValidPass123",
-            "NewPassword456");
-
-        Assert.That(result, Is.True);
+        Assert.DoesNotThrow(() =>
+            _auth.ChangePassword(
+                1,
+                "ValidPass123",
+                "NewPassword456"));
 
         var user = _users.GetById(1);
 
@@ -166,14 +170,13 @@ public class AuthServiceTests
     }
 
     [Test]
-    public void ChangePassword_WithWrongOldPassword_ReturnsFalse()
+    public void ChangePassword_WithWrongOldPassword_ThrowsBusinessException()
     {
-        var result = _auth.ChangePassword(
-            1,
-            "WrongPass123",
-            "NewPassword456");
-
-        Assert.That(result, Is.False);
+        Assert.Throws<BusinessException>(() =>
+            _auth.ChangePassword(
+                1,
+                "WrongPass123",
+                "NewPassword456"));
     }
 
     [Test]
@@ -187,9 +190,21 @@ public class AuthServiceTests
     }
 
     [Test]
+    public void ChangePassword_WithSamePassword_ThrowsBusinessException()
+    {
+        Assert.Throws<BusinessException>(() =>
+            _auth.ChangePassword(
+                1,
+                "ValidPass123",
+                "ValidPass123"));
+    }
+
+    [Test]
     public void Logout_ClearsCurrentSession()
     {
-        _auth.Login("admin", "ValidPass123");
+        _auth.Login(
+            "admin",
+            "ValidPass123");
 
         Assert.That(_session.User, Is.Not.Null);
 
@@ -225,7 +240,9 @@ public class AuthServiceTests
 
             entity.Id = id;
 
-            _nextId = Math.Max(_nextId, id + 1);
+            _nextId = Math.Max(
+                _nextId,
+                id + 1);
 
             _items[id] = entity;
 
@@ -256,7 +273,9 @@ public class AuthServiceTests
                     StringComparison.OrdinalIgnoreCase));
         }
 
-        public bool UpdatePassword(int id, string newHash)
+        public bool UpdatePassword(
+            int id,
+            string newHash)
         {
             if (!_items.TryGetValue(id, out var user))
                 return false;
@@ -266,7 +285,9 @@ public class AuthServiceTests
             return true;
         }
 
-        public bool SetActive(int id, bool isActive)
+        public bool SetActive(
+            int id,
+            bool isActive)
         {
             if (!_items.TryGetValue(id, out var user))
                 return false;

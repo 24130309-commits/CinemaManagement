@@ -1,5 +1,8 @@
-﻿
+﻿using System;
+using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
+using System.Windows.Forms;
 using CinemaManagement.Core.Exceptions;
 using CinemaManagement.Core.Interfaces;
 using CinemaManagement.UI.Helpers;
@@ -9,7 +12,6 @@ namespace CinemaManagement.UI.Forms.Auth;
 public partial class frmLogin : Form
 {
     private readonly IAuthService _auth;
-    private readonly IAuditService _audit;
 
     private readonly TextBox _username = new();
     private readonly TextBox _password = new();
@@ -47,22 +49,17 @@ public partial class frmLogin : Form
     private static readonly Color Border =
         Color.FromArgb(43, 62, 91);
 
-    public frmLogin(IAuthService auth, IAuditService audit)
+    public frmLogin(IAuthService auth)
     {
-        _auth = auth;
-        _audit = audit;
+        _auth = auth
+            ?? throw new ArgumentNullException(nameof(auth));
 
         BuildUi();
     }
 
-    // =========================================================
-    // MAIN UI
-    // =========================================================
-
     private void BuildUi()
     {
         Text = "Cinema Management | Đăng nhập";
-
         StartPosition = FormStartPosition.CenterScreen;
 
         Size = new Size(680, 800);
@@ -102,10 +99,6 @@ public partial class frmLogin : Form
         };
     }
 
-    // =========================================================
-    // LOGIN CARD - PORTRAIT
-    // =========================================================
-
     private void BuildLoginCard(Control parent)
     {
         var card = new Panel
@@ -128,11 +121,9 @@ public partial class frmLogin : Form
 
         CenterCard();
 
-        // Card border.
         card.Paint += (_, e) =>
         {
-            e.Graphics.SmoothingMode =
-                SmoothingMode.AntiAlias;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 
             using var pen = new Pen(Border, 1);
 
@@ -144,10 +135,6 @@ public partial class frmLogin : Form
                 card.Height - 1);
         };
 
-        // =====================================================
-        // LOGO
-        // =====================================================
-
         var logoCircle = new Panel
         {
             Size = new Size(76, 76),
@@ -157,8 +144,7 @@ public partial class frmLogin : Form
 
         logoCircle.Paint += (_, e) =>
         {
-            e.Graphics.SmoothingMode =
-                SmoothingMode.AntiAlias;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 
             using var brush = new LinearGradientBrush(
                 logoCircle.ClientRectangle,
@@ -213,10 +199,6 @@ public partial class frmLogin : Form
             BackColor = Primary
         };
 
-        // =====================================================
-        // TITLE
-        // =====================================================
-
         var title = CreateLabel(
             "Đăng nhập",
             22F,
@@ -235,10 +217,6 @@ public partial class frmLogin : Form
         subtitle.SetBounds(35, 260, 360, 28);
         subtitle.TextAlign = ContentAlignment.MiddleCenter;
 
-        // =====================================================
-        // USERNAME
-        // =====================================================
-
         var usernameLabel = CreateLabel(
             "TÊN ĐĂNG NHẬP",
             8.5F,
@@ -248,15 +226,8 @@ public partial class frmLogin : Form
         usernameLabel.SetBounds(38, 315, 350, 22);
 
         _username.SetBounds(38, 342, 354, 43);
-
         StyleTextBox(_username);
-
-        _username.PlaceholderText =
-            "Nhập tên đăng nhập";
-
-        // =====================================================
-        // PASSWORD
-        // =====================================================
+        _username.PlaceholderText = "Nhập tên đăng nhập";
 
         var passwordLabel = CreateLabel(
             "MẬT KHẨU",
@@ -267,17 +238,10 @@ public partial class frmLogin : Form
         passwordLabel.SetBounds(38, 405, 350, 22);
 
         _password.SetBounds(38, 432, 354, 43);
-
         StyleTextBox(_password);
 
-        _password.PlaceholderText =
-            "Nhập mật khẩu";
-
+        _password.PlaceholderText = "Nhập mật khẩu";
         _password.UseSystemPasswordChar = true;
-
-        // =====================================================
-        // CHECKBOXES
-        // =====================================================
 
         StyleCheckBox(_showPassword);
 
@@ -294,10 +258,6 @@ public partial class frmLogin : Form
 
         _remember.Text = "Ghi nhớ tài khoản";
         _remember.SetBounds(220, 493, 172, 25);
-
-        // =====================================================
-        // CAPS LOCK / ERROR
-        // =====================================================
 
         _capsLabel = CreateLabel(
             "Caps Lock đang bật",
@@ -317,29 +277,19 @@ public partial class frmLogin : Form
         _errorLabel.SetBounds(38, 525, 354, 34);
         _errorLabel.Visible = false;
 
-        // =====================================================
-        // LOGIN BUTTON
-        // =====================================================
-
         _loginButton = new Button
         {
             Text = "ĐĂNG NHẬP",
-
             Location = new Point(38, 565),
             Size = new Size(354, 46),
-
             BackColor = Primary,
             ForeColor = Color.White,
-
             Font = new Font(
                 "Segoe UI",
                 10F,
                 FontStyle.Bold),
-
             FlatStyle = FlatStyle.Flat,
-
             UseVisualStyleBackColor = false,
-
             Cursor = Cursors.Hand
         };
 
@@ -353,10 +303,6 @@ public partial class frmLogin : Form
 
         _loginButton.Click += Login_Click;
 
-        // =====================================================
-        // FOOTER
-        // =====================================================
-
         var footer = CreateLabel(
             "●  HỆ THỐNG BẢO MẬT",
             8F,
@@ -365,10 +311,6 @@ public partial class frmLogin : Form
 
         footer.SetBounds(35, 615, 360, 20);
         footer.TextAlign = ContentAlignment.MiddleCenter;
-
-        // =====================================================
-        // ADD CONTROLS
-        // =====================================================
 
         card.Controls.AddRange(
         [
@@ -391,10 +333,6 @@ public partial class frmLogin : Form
         ]);
     }
 
-    // =========================================================
-    // CONTROL STYLING
-    // =========================================================
-
     private static Label CreateLabel(
         string text,
         float fontSize,
@@ -404,17 +342,13 @@ public partial class frmLogin : Form
         return new Label
         {
             Text = text,
-
             Font = new Font(
                 "Segoe UI",
                 fontSize,
                 style),
-
             ForeColor = foreColor,
             BackColor = Color.Transparent,
-
             AutoSize = false,
-
             UseCompatibleTextRendering = true
         };
     }
@@ -422,36 +356,22 @@ public partial class frmLogin : Form
     private static void StyleTextBox(TextBox textBox)
     {
         textBox.Font = new Font("Segoe UI", 10F);
-
         textBox.ForeColor = TextPrimary;
         textBox.BackColor = SurfaceLight;
-
         textBox.BorderStyle = BorderStyle.FixedSingle;
-
         textBox.Margin = Padding.Empty;
     }
 
     private static void StyleCheckBox(CheckBox checkBox)
     {
         checkBox.AutoSize = false;
-
         checkBox.BackColor = Surface;
         checkBox.ForeColor = TextSecondary;
-
-        checkBox.Font = new Font(
-            "Segoe UI",
-            8.5F);
-
+        checkBox.Font = new Font("Segoe UI", 8.5F);
         checkBox.Cursor = Cursors.Hand;
-
         checkBox.FlatStyle = FlatStyle.Standard;
-
         checkBox.UseVisualStyleBackColor = false;
     }
-
-    // =========================================================
-    // LOGIN LOGIC
-    // =========================================================
 
     private void Login_Click(object? sender, EventArgs e)
     {
@@ -479,26 +399,13 @@ public partial class frmLogin : Form
 
         try
         {
-            var success = _auth.Login(
+            _auth.Login(
                 _username.Text.Trim(),
                 _password.Text);
 
-            if (!success)
-            {
-                ShowError(
-                    "Tên đăng nhập hoặc mật khẩu không chính xác, hoặc tài khoản đã bị khóa.");
-
-                return;
-            }
-
             SaveRememberedUsername();
 
-            _audit.Log(
-                "LOGIN",
-                "Đăng nhập hệ thống thành công.");
-
             DialogResult = DialogResult.OK;
-
             Close();
         }
         catch (BusinessException ex)
@@ -526,7 +433,6 @@ public partial class frmLogin : Form
     private void ShowError(string message)
     {
         _errorLabel.Text = "⚠  " + message;
-
         _errorLabel.Visible = true;
         _capsLabel.Visible = false;
 
@@ -565,10 +471,6 @@ public partial class frmLogin : Form
         if (_capsLabel.Visible)
             _errorLabel.Visible = false;
     }
-
-    // =========================================================
-    // REMEMBER USERNAME
-    // =========================================================
 
     private static string RememberedUsernameFile =>
         Path.Combine(
@@ -627,10 +529,6 @@ public partial class frmLogin : Form
         }
     }
 
-    // =========================================================
-    // BACKGROUND - DARK CINEMA WATERMARK
-    // =========================================================
-
     private sealed class LoginBackgroundPanel : Panel
     {
         public LoginBackgroundPanel()
@@ -653,7 +551,6 @@ public partial class frmLogin : Form
             if (rect.Width <= 0 || rect.Height <= 0)
                 return;
 
-            // Main dark gradient.
             using var backgroundBrush =
                 new LinearGradientBrush(
                     rect,
@@ -665,7 +562,6 @@ public partial class frmLogin : Form
                 backgroundBrush,
                 rect);
 
-            // Large subtle watermark.
             using var watermarkFont = new Font(
                 "Segoe UI",
                 125F,
@@ -682,7 +578,6 @@ public partial class frmLogin : Form
                     rect.Width - 180,
                     rect.Height - 250));
 
-            // Decorative film reel rings.
             int centerX = rect.Width - 70;
             int centerY = 100;
 
@@ -702,7 +597,6 @@ public partial class frmLogin : Form
                     size);
             }
 
-            // Subtle blue glow at bottom.
             using var glowBrush = new SolidBrush(
                 Color.FromArgb(14, 37, 99, 235));
 
@@ -713,7 +607,6 @@ public partial class frmLogin : Form
                 400,
                 300);
 
-            // Top decorative line.
             using var accentBrush =
                 new LinearGradientBrush(
                     new Rectangle(

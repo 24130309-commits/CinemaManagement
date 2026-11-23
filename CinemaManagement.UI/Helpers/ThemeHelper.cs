@@ -1,10 +1,10 @@
-﻿
-﻿namespace CinemaManagement.UI.Helpers;
 
-/// <summary>
-/// Bộ giao diện Light dùng chung cho các màn hình.
-/// Chỉ thay đổi thuộc tính trình bày, không can thiệp dữ liệu hay nghiệp vụ.
-/// </summary>
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace CinemaManagement.UI.Helpers;
+
 public static class ThemeHelper
 {
     public static readonly Color Primary = Color.FromArgb(27, 54, 93);
@@ -18,6 +18,10 @@ public static class ThemeHelper
     public static readonly Color Border = Color.FromArgb(226, 232, 240);
     public static readonly Color Success = Color.FromArgb(22, 163, 74);
     public static readonly Color Danger = Color.FromArgb(220, 38, 38);
+
+    public static readonly Color PrimaryColor = Primary;
+    public static readonly Color DarkSidebarColor = PrimaryDark;
+    public static readonly Color LightBackgroundColor = Background;
 
     public static readonly Font BodyFont = new("Segoe UI", 9.5f);
     public static readonly Font SmallFont = new("Segoe UI", 8.5f);
@@ -36,6 +40,11 @@ public static class ThemeHelper
                 : form.StartPosition;
 
         ApplyControls(form.Controls);
+    }
+
+    public static void ApplyDefaultGridStyle(DataGridView grid)
+    {
+        StyleGrid(grid);
     }
 
     private static void ApplyControls(Control.ControlCollection controls)

@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Interfaces;
 using CinemaManagement.DAL.Database;
@@ -18,7 +18,11 @@ public sealed class RoomRepository
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Query<Room>(
-            "SELECT * FROM Rooms ORDER BY Name").AsList();
+            """
+            SELECT *
+            FROM Rooms
+            ORDER BY Name ASC;
+            """).AsList();
     }
 
     public override Room? GetById(int id)
@@ -26,8 +30,12 @@ public sealed class RoomRepository
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.QuerySingleOrDefault<Room>(
-            "SELECT * FROM Rooms WHERE Id=@id",
-            new { id });
+            """
+            SELECT *
+            FROM Rooms
+            WHERE Id = @Id;
+            """,
+            new { Id = id });
     }
 
     public IEnumerable<Room> GetActive()
@@ -35,45 +43,58 @@ public sealed class RoomRepository
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Query<Room>(
-            "SELECT * FROM Rooms WHERE IsActive=1 ORDER BY Name").AsList();
+            """
+            SELECT *
+            FROM Rooms
+            WHERE IsActive = 1
+            ORDER BY Name ASC;
+            """).AsList();
     }
 
     public bool IsRoomNameExists(
         string name,
         int? excludeId = null)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.ExecuteScalar<bool>(
             """
-            SELECT EXISTS(
+            SELECT EXISTS
+            (
                 SELECT 1
                 FROM Rooms
-                WHERE Name=@name COLLATE NOCASE
-                AND (@excludeId IS NULL OR Id<>@excludeId)
-            )
+                WHERE LOWER(TRIM(Name)) = LOWER(TRIM(@Name))
+                  AND (@ExcludeId IS NULL OR Id <> @ExcludeId)
+            );
             """,
             new
             {
-                name = name.Trim(),
-                excludeId
+                Name = name.Trim(),
+                ExcludeId = excludeId
             });
     }
 
     public override int Insert(Room room)
     {
+        ArgumentNullException.ThrowIfNull(room);
+
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.ExecuteScalar<int>(
             """
-            INSERT INTO Rooms(
+            INSERT INTO Rooms
+            (
                 Name,
                 TotalRows,
                 TotalCols,
                 ScreenType,
                 IsActive
             )
-            VALUES(
+            VALUES
+            (
                 @Name,
                 @TotalRows,
                 @TotalCols,
@@ -93,21 +114,26 @@ public sealed class RoomRepository
             });
     }
 
-    public int Add(Room room) => Insert(room);
+    public int Add(Room room)
+    {
+        return Insert(room);
+    }
 
     public override bool Update(Room room)
     {
+        ArgumentNullException.ThrowIfNull(room);
+
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Execute(
             """
             UPDATE Rooms
-            SET Name=@Name,
-                TotalRows=@TotalRows,
-                TotalCols=@TotalCols,
-                ScreenType=@ScreenType,
-                IsActive=@IsActive
-            WHERE Id=@Id;
+            SET Name = @Name,
+                TotalRows = @TotalRows,
+                TotalCols = @TotalCols,
+                ScreenType = @ScreenType,
+                IsActive = @IsActive
+            WHERE Id = @Id;
             """,
             new
             {
@@ -125,7 +151,10 @@ public sealed class RoomRepository
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Execute(
-            "DELETE FROM Rooms WHERE Id=@id",
-            new { id }) > 0;
+            """
+            DELETE FROM Rooms
+            WHERE Id = @Id;
+            """,
+            new { Id = id }) > 0;
     }
 }
