@@ -1,3 +1,4 @@
+using System;
 using CinemaManagement.Core.Enums;
 
 namespace CinemaManagement.Core.Entities;
@@ -27,6 +28,8 @@ public class Movie
     public string PosterPath { get; set; } = string.Empty;
 
     public string TrailerUrl { get; set; } = string.Empty;
+
+    public string VideoPath { get; set; } = string.Empty;
 
     public int AgeLimit { get; set; }
 

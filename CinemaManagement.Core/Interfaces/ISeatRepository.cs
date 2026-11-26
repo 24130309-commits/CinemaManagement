@@ -9,9 +9,15 @@ public interface ISeatRepository
 
     int InsertBatch(IEnumerable<Seat> seats);
 
-    int ReplaceByRoom(int roomId, IEnumerable<Seat> seats);
+    int ReplaceByRoom(
+        int roomId,
+        IEnumerable<Seat> seats,
+        int totalRows,
+        int totalCols);
 
     bool DeleteByRoom(int roomId);
 
     bool UpdateType(int seatId, SeatType type);
+
+    int UpdateTypes(IEnumerable<Seat> seats);
 }

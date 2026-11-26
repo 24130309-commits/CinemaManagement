@@ -11,4 +11,5 @@ public partial interface ISettingService
 
     void Set(string key, string value);
     void SaveSetting(string key, string value);
+    void SaveOperationalSettings(string cinemaName, int holdMinutes, int cleaningMinutes);
 }

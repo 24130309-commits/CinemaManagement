@@ -19,5 +19,7 @@ public interface IRoomService
 
     void UpdateSeatType(int seatId, SeatType type);
 
+    void UpdateSeatTypes(IEnumerable<Seat> seats);
+
     void GenerateSeats(int roomId, int rows, int cols);
 }

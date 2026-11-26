@@ -1,0 +1,28 @@
+CINEMA MANAGEMENT - PORTABLE DATA
+=================================
+
+This folder contains the portable SQLite database and movie posters.
+
+Structure:
+- CinemaManagement.db : SQLite database copied from the supplied backup
+- Posters/            : poster image files
+- Movies/             : reserved for the 5 permitted demo video files
+
+Database preparation:
+- PosterPath values were converted to relative paths (Posters/<filename>).
+- VideoPath column was added and is currently empty for all movies.
+- Original data was preserved; no movie rows were deleted.
+- SQLite integrity check: ok
+
+Current inventory:
+- Movie rows: 52
+- Movies with poster paths: 51
+- Movies with video paths: 0
+- Poster files copied: 51
+
+IMPORTANT:
+This is the portable DATA package only. The WinForms source code still needs
+the corresponding storage-path update before the application will automatically
+use this Data folder. Do not replace your original LocalAppData folder yet.
+Add only video files you are authorized to use for the demo into Movies/,
+then the application code can be configured to point to those relative paths.

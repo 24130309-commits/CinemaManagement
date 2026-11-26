@@ -14,9 +14,9 @@ public interface IReportService
         DateTime fromDate,
         DateTime toDate);
 
-    IEnumerable<dynamic> GetRevenueByDay(
+    IEnumerable<RevenueByDayDto> GetRevenueByDay(
         DateTime from,
         DateTime to);
 
-    dynamic GetDashboardStats();
+    DashboardStatsDto GetDashboardStats();
 }

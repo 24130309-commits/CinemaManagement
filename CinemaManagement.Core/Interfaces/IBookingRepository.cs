@@ -10,10 +10,14 @@ public interface IBookingRepository
 
     Booking? GetById(int id);
 
+    List<BookingProduct> GetProductsByBookingId(int bookingId);
+
     int Add(
         Booking booking,
         List<Ticket> tickets,
-        List<BookingProduct> products);
+        List<BookingProduct> products,
+        int customerId,
+        string sessionId,
+        int? promotionId = null);
 
-    void UpdateStatus(int bookingId, string status);
 }

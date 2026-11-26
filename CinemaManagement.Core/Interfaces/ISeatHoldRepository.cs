@@ -17,5 +17,9 @@ public interface ISeatHoldRepository
 
     void Update(SeatHold seatHold);
 
+    bool TryAcquireOrExtend(SeatHold seatHold);
+
+    bool ReleaseIfOwned(int holdId, string sessionId);
+
     void ReleaseExpiredHolds();
 }

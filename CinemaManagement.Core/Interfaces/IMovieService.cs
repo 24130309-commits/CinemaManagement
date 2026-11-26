@@ -13,4 +13,10 @@ public interface IMovieService
     void UpdateMovie(Movie movie);
 
     void DeleteMovie(int id);
+
+    IEnumerable<int> GetGenreIds(int movieId);
+
+    void SetGenres(int movieId, IEnumerable<int> genreIds);
+
+    void SaveMovie(Movie movie, IEnumerable<int>? genreIds);
 }

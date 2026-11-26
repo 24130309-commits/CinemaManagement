@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 using CinemaManagement.Core.Constants;
 using CinemaManagement.Core.Interfaces;
+using CinemaManagement.UI.Controls;
 using CinemaManagement.UI.Helpers;
 
 namespace CinemaManagement.UI.Forms.Management;
@@ -35,7 +36,7 @@ public partial class frmSettings : Form
         Width = 300
     };
 
-    private readonly DataGridView _logs = new()
+    private readonly EmptyStateDataGridView _logs = new()
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
@@ -65,6 +66,14 @@ public partial class frmSettings : Form
         Width = 180
     };
 
+    private readonly Label _auditStatus = new()
+    {
+        Dock = DockStyle.Bottom,
+        Height = 30,
+        TextAlign = ContentAlignment.MiddleLeft,
+        ForeColor = ThemeHelper.Muted
+    };
+
     public frmSettings(
         ISettingService settings,
         IBackupService backup,
@@ -87,8 +96,9 @@ public partial class frmSettings : Form
 
         Text = "Cài đặt hệ thống";
         StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new Size(980, 680);
+        MinimumSize = new Size(760, 560);
         Size = new Size(1050, 720);
+        _logs.EmptyStateText = "Không có nhật ký nào trong bộ lọc thời gian đã chọn.";
 
         var tabs = new TabControl
         {
@@ -97,17 +107,17 @@ public partial class frmSettings : Form
 
         var config = new TabPage("Cấu hình")
         {
-            Padding = new Padding(18)
+            Padding = new Padding(8)
         };
 
         var backupPage = new TabPage("Sao lưu / Khôi phục")
         {
-            Padding = new Padding(18)
+            Padding = new Padding(8)
         };
 
         var auditPage = new TabPage("Nhật ký thao tác")
         {
-            Padding = new Padding(18)
+            Padding = new Padding(8)
         };
 
         BuildConfig(config);
@@ -122,6 +132,9 @@ public partial class frmSettings : Form
         });
 
         Controls.Add(tabs);
+        Controls.Add(new PageHeader(
+            "Cài đặt hệ thống",
+            "Cấu hình vận hành, sao lưu an toàn và xem nhật ký quản trị."));
 
         Load += (_, _) =>
         {
@@ -135,35 +148,40 @@ public partial class frmSettings : Form
 
     private void BuildConfig(TabPage page)
     {
-        page.Controls.Add(new Label
+        var layout = new TableLayoutPanel
         {
-            Text = "THIẾT LẬP VẬN HÀNH",
-            Location = new Point(35, 8),
-            Size = new Size(360, 28),
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 1,
+            RowCount = 5,
+            Padding = new Padding(18),
+            BackColor = ThemeHelper.Surface
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+
+        var title = new Label
+        {
+            Text = "Thiết lập vận hành",
+            Dock = DockStyle.Fill,
             Font = ThemeHelper.SectionFont,
-            ForeColor = ThemeHelper.Primary
-        });
-
-        AddLabel(page, "Tên rạp", 35, 48);
-
-        _cinema.Location = new Point(220, 68);
-        page.Controls.Add(_cinema);
-
-        AddLabel(page, "Thời gian giữ ghế (phút)", 35, 116);
-
-        _hold.Location = new Point(220, 136);
-        page.Controls.Add(_hold);
-
-        AddLabel(page, "Thời gian dọn phòng (phút)", 35, 184);
-
-        _clean.Location = new Point(220, 204);
-        page.Controls.Add(_clean);
+            ForeColor = ThemeHelper.Primary,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        layout.Controls.Add(title, 0, 0);
+        layout.Controls.Add(CreateSettingField("Tên rạp", _cinema), 0, 1);
+        layout.Controls.Add(CreateSettingField("Thời gian giữ ghế (phút)", _hold), 0, 2);
+        layout.Controls.Add(CreateSettingField("Thời gian dọn phòng (phút)", _clean), 0, 3);
 
         var save = new Button
         {
             Text = "Lưu cấu hình",
-            Location = new Point(220, 264),
-            Size = new Size(140, 40)
+            Size = new Size(150, 40),
+            Anchor = AnchorStyles.Left | AnchorStyles.Top
         };
 
         save.Click += (_, _) =>
@@ -176,17 +194,10 @@ public partial class frmSettings : Form
                         "Tên rạp không được để trống.");
                 }
 
-                _settings.SaveSetting(
-                    AppConstants.SettingCinemaName,
-                    _cinema.Text.Trim());
-
-                _settings.SaveSetting(
-                    AppConstants.SettingHoldMinutes,
-                    ((int)_hold.Value).ToString(CultureInfo.InvariantCulture));
-
-                _settings.SaveSetting(
-                    AppConstants.SettingCleaningMinutes,
-                    ((int)_clean.Value).ToString(CultureInfo.InvariantCulture));
+                _settings.SaveOperationalSettings(
+                    _cinema.Text,
+                    (int)_hold.Value,
+                    (int)_clean.Value);
 
                 _audit.Log(
                     "SETTING_UPDATE",
@@ -200,36 +211,53 @@ public partial class frmSettings : Form
             }
         };
 
-        page.Controls.Add(save);
+        layout.Controls.Add(save, 0, 4);
+        page.Controls.Add(layout);
     }
 
     private void BuildBackup(TabPage page)
     {
-        page.Controls.Add(new Label
+        var root = new TableLayoutPanel
         {
-            Text = "SAO LƯU VÀ KHÔI PHỤC DỮ LIỆU",
-            Location = new Point(35, 8),
-            Size = new Size(430, 28),
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 1,
+            RowCount = 3,
+            Padding = new Padding(18),
+            BackColor = ThemeHelper.Surface
+        };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
+
+        root.Controls.Add(new Label
+        {
+            Text = "Sao lưu và khôi phục dữ liệu",
+            Dock = DockStyle.Fill,
             Font = ThemeHelper.SectionFont,
-            ForeColor = ThemeHelper.Primary
-        });
+            ForeColor = ThemeHelper.Primary,
+            TextAlign = ContentAlignment.MiddleLeft
+        }, 0, 0);
 
         var export = new Button
         {
             Text = "Sao lưu cơ sở dữ liệu",
-            Location = new Point(35, 52),
-            Size = new Size(210, 42)
+            Size = new Size(240, 42),
+            Anchor = AnchorStyles.Left
         };
 
         export.Click += (_, _) =>
         {
             using var dialog = new SaveFileDialog
             {
+                Title = "Chọn nơi lưu bản sao lưu",
                 Filter = "SQLite database (*.db)|*.db",
-                FileName = $"cinema_backup_{DateTime.Now:yyyyMMdd_HHmm}.db"
+                FileName = $"cinema_backup_{DateTime.Now:yyyyMMdd_HHmm}.db",
+                RestoreDirectory = true
             };
 
-            if (dialog.ShowDialog() != DialogResult.OK)
+            if (dialog.ShowDialog(this) != DialogResult.OK)
                 return;
 
             try
@@ -251,18 +279,20 @@ public partial class frmSettings : Form
         var restore = new Button
         {
             Text = "Khôi phục từ bản sao lưu",
-            Location = new Point(35, 117),
-            Size = new Size(210, 42)
+            Size = new Size(240, 42),
+            Anchor = AnchorStyles.Left
         };
 
         restore.Click += (_, _) =>
         {
             using var dialog = new OpenFileDialog
             {
-                Filter = "SQLite database (*.db)|*.db|Tất cả tệp (*.*)|*.*"
+                Title = "Chọn bản sao lưu để khôi phục",
+                Filter = "SQLite database (*.db)|*.db|Tất cả tệp (*.*)|*.*",
+                RestoreDirectory = true
             };
 
-            if (dialog.ShowDialog() != DialogResult.OK)
+            if (dialog.ShowDialog(this) != DialogResult.OK)
                 return;
 
             if (!MessageHelper.Confirm(
@@ -286,11 +316,9 @@ public partial class frmSettings : Form
             }
         };
 
-        page.Controls.AddRange(new Control[]
-        {
-            export,
-            restore
-        });
+        root.Controls.Add(export, 0, 1);
+        root.Controls.Add(restore, 0, 2);
+        page.Controls.Add(root);
     }
 
     private void BuildAudit(TabPage page)
@@ -298,9 +326,11 @@ public partial class frmSettings : Form
         var bar = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 64,
-            Padding = new Padding(12, 10, 8, 8),
-            WrapContents = false
+            Height = 112,
+            Padding = new Padding(8),
+            WrapContents = true,
+            AutoScroll = true,
+            BackColor = ThemeHelper.Surface
         };
 
         bar.Controls.Add(new Label
@@ -350,6 +380,7 @@ public partial class frmSettings : Form
         bar.Controls.Add(search);
 
         page.Controls.Add(_logs);
+        page.Controls.Add(_auditStatus);
         page.Controls.Add(bar);
     }
 
@@ -440,12 +471,16 @@ public partial class frmSettings : Form
                 _to.Value.Date.AddDays(1).AddTicks(-1))
                 .ToList();
 
+            _auditStatus.Text = $"{_logs.Rows.Count:N0} mục nhật ký phù hợp";
+
             SetAuditColumn("Id", "Mã nhật ký", false);
             SetAuditColumn("UserId", "Mã người dùng");
             SetAuditColumn("Username", "Người thực hiện");
             SetAuditColumn("Action", "Thao tác");
             SetAuditColumn("EntityName", "Đối tượng");
+            SetAuditColumn("EntityId", "Mã đối tượng");
             SetAuditColumn("Detail", "Chi tiết");
+            SetAuditColumn("Details", "Chi tiết", false);
             SetAuditColumn(
                 "CreatedAt",
                 "Thời gian",
@@ -454,6 +489,7 @@ public partial class frmSettings : Form
         }
         catch (Exception ex)
         {
+            _auditStatus.Text = "Không thể tải nhật ký theo bộ lọc.";
             MessageHelper.Handle(ex);
         }
     }
@@ -464,10 +500,8 @@ public partial class frmSettings : Form
         bool visible = true,
         string? format = null)
     {
-        if (!_logs.Columns.Contains(name))
+        if (_logs.Columns[name] is not DataGridViewColumn column)
             return;
-
-        var column = _logs.Columns[name];
 
         column.HeaderText = header;
         column.Visible = visible;
@@ -484,17 +518,27 @@ public partial class frmSettings : Form
         }
     }
 
-    private static void AddLabel(
-        Control parent,
-        string text,
-        int x,
-        int y)
+    private static Panel CreateSettingField(string caption, Control input)
     {
-        parent.Controls.Add(new Label
+        var field = new Panel
         {
-            Text = text,
-            Location = new Point(x, y),
-            AutoSize = true
-        });
+            Dock = DockStyle.Fill,
+            Padding = new Padding(2),
+            Margin = new Padding(0, 2, 0, 6),
+            BackColor = ThemeHelper.Surface
+        };
+
+        var label = new Label
+        {
+            Text = caption,
+            Dock = DockStyle.Top,
+            Height = 26,
+            ForeColor = ThemeHelper.Text,
+            Font = ThemeHelper.SectionFont
+        };
+        input.Dock = DockStyle.Fill;
+        field.Controls.Add(input);
+        field.Controls.Add(label);
+        return field;
     }
 }

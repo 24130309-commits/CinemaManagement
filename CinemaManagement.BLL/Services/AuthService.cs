@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using CinemaManagement.BLL.Session;
 using CinemaManagement.BLL.Validators;
 using CinemaManagement.Core.Constants;
@@ -87,11 +88,7 @@ public sealed class AuthService : IAuthService
 
         _session.Set(user);
 
-        _audit?.Log(
-            "LOGIN",
-            "User",
-            user.Id,
-            $"Người dùng {user.Username} đăng nhập hệ thống.");
+        TryAudit("LOGIN", user.Id, $"Người dùng {user.Username} đăng nhập hệ thống.");
 
         return user;
     }
@@ -100,16 +97,15 @@ public sealed class AuthService : IAuthService
     {
         var user = _session.User;
 
-        if (user is not null)
+        try
         {
-            _audit?.Log(
-                "LOGOUT",
-                "User",
-                user.Id,
-                $"Người dùng {user.Username} đăng xuất.");
+            if (user is not null)
+                TryAudit("LOGOUT", user.Id, $"Người dùng {user.Username} đăng xuất.");
         }
-
-        _session.Clear();
+        finally
+        {
+            _session.Clear();
+        }
     }
 
     public void ChangePassword(
@@ -117,6 +113,12 @@ public sealed class AuthService : IAuthService
         string oldPassword,
         string newPassword)
     {
+        if (!_session.IsAuthenticated || _session.User?.Id != userId)
+        {
+            throw new BusinessException(
+                "Bạn chỉ có thể đổi mật khẩu của tài khoản đang đăng nhập.");
+        }
+
         if (string.IsNullOrWhiteSpace(oldPassword))
         {
             throw new BusinessException(
@@ -153,6 +155,27 @@ public sealed class AuthService : IAuthService
         {
             throw new BusinessException(
                 "Không thể cập nhật mật khẩu. Vui lòng thử lại.");
+        }
+
+        TryAudit(
+            "CHANGE_PASSWORD",
+            userId,
+            $"Người dùng {user.Username} đổi mật khẩu.");
+    }
+
+    private void TryAudit(string action, int userId, string detail)
+    {
+        try
+        {
+            _audit?.Log(action, "User", userId, detail);
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceError(
+                "Authentication action {0} for user {1} succeeded, but audit logging failed: {2}",
+                action,
+                userId,
+                ex);
         }
     }
 

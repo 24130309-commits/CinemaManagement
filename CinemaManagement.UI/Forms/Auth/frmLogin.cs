@@ -1,4 +1,6 @@
-﻿using System;
+﻿
+using System;
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -12,39 +14,30 @@ namespace CinemaManagement.UI.Forms.Auth;
 public partial class frmLogin : Form
 {
     private readonly IAuthService _auth;
-
     private readonly TextBox _username = new();
     private readonly TextBox _password = new();
-
     private readonly CheckBox _remember = new();
-    private readonly CheckBox _showPassword = new();
-
     private Label _errorLabel = new();
     private Label _capsLabel = new();
-
-    private Button _loginButton = null!;
+    private RoundedButton _loginButton = null!;
+    private RoundedInput _usernameHost = null!;
+    private RoundedInput _passwordHost = null!;
     private bool _isLoggingIn;
 
-    private static readonly Color Background =
-        ThemeHelper.PrimaryDark;
-
-    private static readonly Color Primary =
-        ThemeHelper.Structural;
-
-    private static readonly Color PrimaryHover =
-        ThemeHelper.AccentHover;
-
-    private static readonly Color TextPrimary =
-        Color.FromArgb(241, 245, 249);
-
-    private static readonly Color Border =
-        ThemeHelper.StructuralSoft;
+    private static readonly Color Background = Color.FromArgb(8, 14, 27);
+    private static readonly Color BackgroundTop = Color.FromArgb(9, 16, 31);
+    private static readonly Color BackgroundBottom = Color.FromArgb(19, 30, 48);
+    private static readonly Color CardColor = Color.FromArgb(19, 30, 48);
+    private static readonly Color Accent = Color.FromArgb(239, 153, 65);
+    private static readonly Color AccentHover = Color.FromArgb(250, 174, 87);
+    private static readonly Color TextDark = Color.FromArgb(235, 240, 248);
+    private static readonly Color Muted = Color.FromArgb(148, 163, 184);
+    private static readonly Color InputBackground = Color.FromArgb(12, 21, 36);
+    private static readonly Color InputBorder = Color.FromArgb(48, 64, 85);
 
     public frmLogin(IAuthService auth)
     {
-        _auth = auth
-            ?? throw new ArgumentNullException(nameof(auth));
-
+        _auth = auth ?? throw new ArgumentNullException(nameof(auth));
         BuildUi();
     }
 
@@ -52,64 +45,50 @@ public partial class frmLogin : Form
     {
         Text = "Cinema Management | Đăng nhập";
         StartPosition = FormStartPosition.CenterScreen;
-
-        Size = new Size(980, 680);
-        MinimumSize = new Size(760, 560);
+        ClientSize = new Size(460, 720);
+        MinimumSize = new Size(460, 720);
+        MaximumSize = new Size(460, 720);
+        FormBorderStyle = FormBorderStyle.None;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        BackColor = Background;
+        ForeColor = TextDark;
+        Font = new Font("Segoe UI", 9.5F);
         ThemeHelper.ConfigureDpiScaling(this);
         AccessibleName = "Đăng nhập Cinema Management";
         AccessibleDescription = "Cổng đăng nhập dành cho nhân viên rạp chiếu phim";
 
-        BackColor = Background;
-        ForeColor = TextPrimary;
-
-        Font = new Font("Segoe UI", 10F);
-
-        FormBorderStyle = FormBorderStyle.Sizable;
-        MaximizeBox = false;
-        MinimizeBox = true;
-
-        var shell = new TableLayoutPanel
+        var backdrop = new LoginBackdrop
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 1,
-            Margin = Padding.Empty,
-            Padding = Padding.Empty,
             BackColor = Background
         };
-        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 39));
-        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 61));
 
-        var brand = new LoginBrandPanel { Dock = DockStyle.Fill };
-        BuildBrandContent(brand);
+        Controls.Add(backdrop);
 
-        var signInArea = new Panel
+        var card = new LoginCard
         {
-            Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(243, 246, 250),
-            Padding = new Padding(20)
+            Size = new Size(366, 570),
+            BackColor = CardColor
         };
 
-        var card = BuildLoginCard();
-        signInArea.Controls.Add(card);
+        backdrop.Controls.Add(card);
 
-        void CenterCard()
+        void PositionCard()
         {
-            card.Width = Math.Clamp(signInArea.ClientSize.Width - 24, 340, 430);
-            card.Height = Math.Clamp(signInArea.ClientSize.Height - 24, 460, 480);
             card.Location = new Point(
-                Math.Max(0, (signInArea.ClientSize.Width - card.Width) / 2),
-                Math.Max(0, (signInArea.ClientSize.Height - card.Height) / 2));
+                Math.Max(12, (backdrop.ClientSize.Width - card.Width) / 2),
+                Math.Max(12, (backdrop.ClientSize.Height - card.Height) / 2));
+
+            backdrop.SetShadowBounds(card.Bounds);
+            card.ApplyRoundedRegion();
+            backdrop.Invalidate();
         }
 
-        signInArea.Resize += (_, _) => CenterCard();
-        CenterCard();
+        backdrop.Resize += (_, _) => PositionCard();
+        PositionCard();
 
-        shell.Controls.Add(brand, 0, 0);
-        shell.Controls.Add(signInArea, 1, 0);
-
-        Controls.Add(shell);
-
+        BuildCardContent(card);
         LoadRememberedUsername();
 
         AcceptButton = _loginButton;
@@ -117,173 +96,182 @@ public partial class frmLogin : Form
 
         _username.KeyDown += Username_KeyDown;
         _password.KeyDown += Password_KeyDown;
-
         _password.KeyUp += (_, _) => UpdateCapsLock();
         _password.Enter += (_, _) => UpdateCapsLock();
-        _password.Leave += (_, _) =>
-        {
-            _capsLabel.Visible = false;
-        };
+        _password.Leave += (_, _) => _capsLabel.Visible = false;
     }
 
-    private static void BuildBrandContent(Control parent)
+    private void BuildCardContent(Control card)
     {
-        var brandTitle = CreateLabel(
-            "CINEMA",
-            16F,
-            FontStyle.Bold,
-            Color.White);
-        brandTitle.TextAlign = ContentAlignment.MiddleLeft;
-
-        var brandSubtitle = CreateLabel(
-            "MANAGEMENT",
-            13F,
-            FontStyle.Bold,
-            Color.FromArgb(203, 213, 225));
-        brandSubtitle.TextAlign = ContentAlignment.MiddleLeft;
-
-        var mark = new Label
+        var brandMark = new Label
         {
             Text = "C",
-            Location = new Point(30, 36),
-            Size = new Size(54, 54),
-            BackColor = ThemeHelper.Accent,
-            ForeColor = ThemeHelper.Primary,
+            Size = new Size(48, 48),
+            Location = new Point(159, 22),
+            BackColor = Accent,
+            ForeColor = Background,
             Font = new Font("Segoe UI", 23F, FontStyle.Bold),
-            TextAlign = ContentAlignment.MiddleCenter,
-            AccessibleName = "Biểu trưng Cinema Management"
+            TextAlign = ContentAlignment.MiddleCenter
         };
 
-        parent.Controls.AddRange([brandTitle, brandSubtitle, mark]);
-
-        void LayoutBrand()
-        {
-            var width = Math.Max(220, parent.ClientSize.Width);
-            var nameWidth = Math.Clamp(width - 104, 190, 260);
-            var groupWidth = 72 + nameWidth;
-            var left = Math.Max(12, (width - groupWidth) / 2);
-            var top = Math.Max(32, (parent.ClientSize.Height - 54) / 2);
-            mark.Location = new Point(left, top);
-            brandTitle.SetBounds(left + 72, top - 4, nameWidth, 38);
-            brandSubtitle.SetBounds(left + 72, top + 30, nameWidth, 34);
-        }
-
-        parent.Resize += (_, _) => LayoutBrand();
-        LayoutBrand();
-    }
-
-    private Panel BuildLoginCard()
-    {
-        const int cardWidth = 430;
-        const int cardHeight = 480;
-        var card = new Panel
-        {
-            Size = new Size(cardWidth, cardHeight),
-            BackColor = Color.White,
-            Padding = new Padding(34),
-            AccessibleName = "Đăng nhập Cinema Management"
-        };
-        card.Paint += (_, e) =>
+        brandMark.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using var border = new Pen(Border);
-            e.Graphics.DrawRectangle(border, 0, 0, card.Width - 1, card.Height - 1);
-            using var accent = new SolidBrush(Primary);
-            e.Graphics.FillRectangle(accent, 0, 0, 5, card.Height);
+
+            using var path = CreateRoundPath(brandMark.ClientRectangle, 13);
+            using var brush = new SolidBrush(Accent);
+
+            e.Graphics.FillPath(brush, path);
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                "C",
+                brandMark.Font,
+                brandMark.ClientRectangle,
+                Background,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         };
 
-        var title = CreateLabel("Đăng nhập", 20F, FontStyle.Bold, ThemeHelper.Primary);
-        title.TextAlign = ContentAlignment.MiddleLeft;
-        title.SetBounds(34, 26, 360, 54);
+        var brand = CreateLabel(
+            "CINEMA MANAGEMENT",
+            9F,
+            FontStyle.Bold,
+            Accent);
 
-        var usernameLabel = CreateLabel("TÊN ĐĂNG NHẬP", 9F, FontStyle.Bold, Color.FromArgb(71, 85, 105));
-        usernameLabel.SetBounds(36, 103, 350, 20);
+        brand.TextAlign = ContentAlignment.MiddleCenter;
+        brand.SetBounds(28, 77, 310, 22);
+
+        var title = CreateLabel("LOGIN", 23F, FontStyle.Bold, TextDark);
+        title.TextAlign = ContentAlignment.MiddleCenter;
+        title.SetBounds(28, 106, 310, 42);
+
+        var subtitle = CreateLabel(
+            "Chào mừng trở lại!",
+            10F,
+            FontStyle.Regular,
+            Muted);
+
+        subtitle.TextAlign = ContentAlignment.MiddleCenter;
+        subtitle.SetBounds(28, 148, 310, 25);
+
+        var usernameLabel = CreateLabel(
+            "TÊN ĐĂNG NHẬP",
+            9F,
+            FontStyle.Bold,
+            Muted);
+
+        usernameLabel.SetBounds(30, 196, 306, 20);
+
+        _usernameHost = new RoundedInput
+        {
+            Size = new Size(306, 46),
+            Location = new Point(30, 220),
+            FillColor = InputBackground,
+            BorderColor = InputBorder,
+            Radius = 12
+        };
 
         StyleLoginTextBox(_username);
-        _username.SetBounds(36, 126, 358, 42);
         _username.PlaceholderText = "Nhập tên đăng nhập";
         _username.AccessibleName = "Tên đăng nhập";
         _username.AccessibleDescription = "Nhập tên tài khoản nhân viên";
+        _username.SetBounds(12, 10, 280, 26);
 
-        var passwordLabel = CreateLabel("MẬT KHẨU", 9F, FontStyle.Bold, Color.FromArgb(71, 85, 105));
-        passwordLabel.SetBounds(36, 189, 350, 20);
+        _usernameHost.Controls.Add(_username);
+
+        var passwordLabel = CreateLabel(
+            "MẬT KHẨU",
+            9F,
+            FontStyle.Bold,
+            Muted);
+
+        passwordLabel.SetBounds(30, 280, 306, 20);
+
+        _passwordHost = new RoundedInput
+        {
+            Size = new Size(306, 46),
+            Location = new Point(30, 304),
+            FillColor = InputBackground,
+            BorderColor = InputBorder,
+            Radius = 12
+        };
 
         StyleLoginTextBox(_password);
-        _password.SetBounds(36, 212, 358, 42);
         _password.PlaceholderText = "Nhập mật khẩu";
         _password.UseSystemPasswordChar = true;
         _password.AccessibleName = "Mật khẩu";
         _password.AccessibleDescription = "Nhập mật khẩu tài khoản";
+        _password.SetBounds(12, 10, 280, 26);
 
-        StyleCheckBox(_showPassword);
-        _showPassword.Text = "Hiện mật khẩu";
-        _showPassword.SetBounds(36, 270, 145, 26);
-        _showPassword.CheckedChanged += (_, _) => _password.UseSystemPasswordChar = !_showPassword.Checked;
+        _passwordHost.Controls.Add(_password);
 
         StyleCheckBox(_remember);
         _remember.Text = "Ghi nhớ tài khoản";
-        _remember.SetBounds(218, 270, 176, 26);
+        _remember.SetBounds(30, 361, 180, 26);
 
-        _capsLabel = CreateLabel("Caps Lock đang bật", 8F, FontStyle.Bold, Color.FromArgb(156, 93, 20));
-        _capsLabel.SetBounds(36, 308, 358, 24);
+        _capsLabel = CreateLabel(
+            "Caps Lock đang bật",
+            8.5F,
+            FontStyle.Bold,
+            Accent);
+
+        _capsLabel.SetBounds(30, 392, 306, 22);
         _capsLabel.Visible = false;
 
-        _errorLabel = CreateLabel("", 8.5F, FontStyle.Bold, ThemeHelper.Danger);
-        _errorLabel.SetBounds(36, 308, 358, 38);
+        _errorLabel = CreateLabel(
+            "",
+            8.5F,
+            FontStyle.Bold,
+            ThemeHelper.Danger);
+
+        _errorLabel.SetBounds(30, 392, 306, 38);
         _errorLabel.Visible = false;
         _errorLabel.AutoEllipsis = true;
         _errorLabel.AccessibleRole = AccessibleRole.Alert;
 
-        _loginButton = new Button
+        _loginButton = new RoundedButton
         {
-            Text = "ĐĂNG NHẬP",
-            Location = new Point(36, 365),
-            Size = new Size(358, 48),
-            BackColor = ThemeHelper.Accent,
-            ForeColor = ThemeHelper.Primary,
-            Font = new Font(
-                "Segoe UI",
-                10F,
-                FontStyle.Bold),
-            FlatStyle = FlatStyle.Flat,
-            UseVisualStyleBackColor = false,
-            Cursor = Cursors.Hand
+            Text = "LOGIN",
+            Size = new Size(230, 44),
+            Location = new Point(68, 448),
+            BackColor = Accent,
+            ForeColor = Background,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            Radius = 12
         };
 
-        _loginButton.FlatAppearance.BorderSize = 0;
-        _loginButton.AccessibleName = "Đăng nhập";
+        _loginButton.HoverColor = AccentHover;
+        _loginButton.PressedColor = Color.FromArgb(213, 125, 40);
+        _loginButton.AccessibleName = "Login";
         _loginButton.AccessibleDescription = "Xác thực thông tin để mở hệ thống";
-
-        _loginButton.FlatAppearance.MouseOverBackColor =
-            PrimaryHover;
-
-        _loginButton.FlatAppearance.MouseDownBackColor =
-            ThemeHelper.AccentHover;
-
         _loginButton.Click += Login_Click;
 
-        card.Controls.AddRange(
-        [
+        var footer = CreateLabel(
+            "SECURE CINEMA SYSTEM",
+            8F,
+            FontStyle.Bold,
+            Color.FromArgb(120, 140, 163));
+
+        footer.TextAlign = ContentAlignment.MiddleCenter;
+        footer.SetBounds(30, 518, 306, 22);
+
+        card.Controls.AddRange(new Control[]
+        {
+            brandMark,
+            brand,
             title,
+            subtitle,
             usernameLabel,
-            _username,
+            _usernameHost,
             passwordLabel,
-            _password,
-            _showPassword,
+            _passwordHost,
             _remember,
             _capsLabel,
             _errorLabel,
-            _loginButton
-        ]);
-
-        card.Resize += (_, _) =>
-        {
-            var width = Math.Max(300, card.ClientSize.Width - 72);
-            foreach (var control in new Control[] { usernameLabel, _username, passwordLabel, _password, _capsLabel, _errorLabel, _loginButton })
-                control.Width = width;
-            _remember.Left = Math.Max(190, card.ClientSize.Width - 212);
-        };
-        return card;
+            _loginButton,
+            footer
+        });
     }
 
     private static Label CreateLabel(
@@ -295,15 +283,10 @@ public partial class frmLogin : Form
         return new Label
         {
             Text = text,
-            Font = new Font(
-                "Segoe UI",
-                fontSize,
-                style),
+            Font = new Font("Segoe UI", fontSize, style),
             ForeColor = foreColor,
             BackColor = Color.Transparent,
             AutoSize = false,
-            // Use WinForms' native text renderer to avoid GDI+ baseline clipping
-            // and stray strokes on large Vietnamese glyphs at scaled DPI settings.
             UseCompatibleTextRendering = false
         };
     }
@@ -311,9 +294,9 @@ public partial class frmLogin : Form
     private static void StyleCheckBox(CheckBox checkBox)
     {
         checkBox.AutoSize = false;
-        checkBox.BackColor = Color.White;
-        checkBox.ForeColor = Color.FromArgb(71, 85, 105);
-        checkBox.Font = new Font("Segoe UI", 9.5F);
+        checkBox.BackColor = CardColor;
+        checkBox.ForeColor = Color.FromArgb(203, 213, 225);
+        checkBox.Font = new Font("Segoe UI", 9F);
         checkBox.Cursor = Cursors.Hand;
         checkBox.FlatStyle = FlatStyle.Standard;
         checkBox.UseVisualStyleBackColor = false;
@@ -321,10 +304,10 @@ public partial class frmLogin : Form
 
     private static void StyleLoginTextBox(TextBox textBox)
     {
-        textBox.Font = new Font("Segoe UI", 11F);
-        textBox.ForeColor = ThemeHelper.Text;
-        textBox.BackColor = Color.White;
-        textBox.BorderStyle = BorderStyle.FixedSingle;
+        textBox.Font = new Font("Segoe UI", 10.5F);
+        textBox.ForeColor = TextDark;
+        textBox.BackColor = InputBackground;
+        textBox.BorderStyle = BorderStyle.None;
         textBox.Margin = Padding.Empty;
     }
 
@@ -336,30 +319,21 @@ public partial class frmLogin : Form
         if (string.IsNullOrWhiteSpace(_username.Text) ||
             string.IsNullOrEmpty(_password.Text))
         {
-            ShowError(
-                "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.");
-
+            ShowError("Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.");
             return;
         }
 
         _isLoggingIn = true;
-
         _loginButton.Enabled = false;
         _loginButton.Text = "ĐANG XÁC THỰC...";
-
         UseWaitCursor = true;
-
         _errorLabel.Visible = false;
         _capsLabel.Visible = false;
 
         try
         {
-            _auth.Login(
-                _username.Text.Trim(),
-                _password.Text);
-
+            _auth.Login(_username.Text.Trim(), _password.Text);
             SaveRememberedUsername();
-
             DialogResult = DialogResult.OK;
             Close();
         }
@@ -378,9 +352,8 @@ public partial class frmLogin : Form
             if (!IsDisposed)
             {
                 UseWaitCursor = false;
-
                 _loginButton.Enabled = true;
-                _loginButton.Text = "ĐĂNG NHẬP";
+                _loginButton.Text = "LOGIN";
             }
         }
     }
@@ -390,14 +363,11 @@ public partial class frmLogin : Form
         _errorLabel.Text = "⚠  " + message;
         _errorLabel.Visible = true;
         _capsLabel.Visible = false;
-
         _password.Focus();
         _password.SelectAll();
     }
 
-    private void Username_KeyDown(
-        object? sender,
-        KeyEventArgs e)
+    private void Username_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Enter)
         {
@@ -406,9 +376,7 @@ public partial class frmLogin : Form
         }
     }
 
-    private void Password_KeyDown(
-        object? sender,
-        KeyEventArgs e)
+    private void Password_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Enter)
         {
@@ -420,8 +388,7 @@ public partial class frmLogin : Form
     private void UpdateCapsLock()
     {
         _capsLabel.Visible =
-            Control.IsKeyLocked(Keys.CapsLock) &&
-            _password.Focused;
+            Control.IsKeyLocked(Keys.CapsLock) && _password.Focused;
 
         if (_capsLabel.Visible)
             _errorLabel.Visible = false;
@@ -429,8 +396,7 @@ public partial class frmLogin : Form
 
     private static string RememberedUsernameFile =>
         Path.Combine(
-            Environment.GetFolderPath(
-                Environment.SpecialFolder.LocalApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "CinemaManagement",
             "remembered-user.txt");
 
@@ -441,8 +407,7 @@ public partial class frmLogin : Form
             if (!File.Exists(RememberedUsernameFile))
                 return;
 
-            var username = File.ReadAllText(
-                RememberedUsernameFile).Trim();
+            var username = File.ReadAllText(RememberedUsernameFile).Trim();
 
             if (!string.IsNullOrWhiteSpace(username))
             {
@@ -464,12 +429,8 @@ public partial class frmLogin : Form
 
             if (_remember.Checked)
             {
-                Directory.CreateDirectory(
-                    Path.GetDirectoryName(path)!);
-
-                File.WriteAllText(
-                    path,
-                    _username.Text.Trim());
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path, _username.Text.Trim());
             }
             else if (File.Exists(path))
             {
@@ -478,19 +439,188 @@ public partial class frmLogin : Form
         }
         catch (Exception ex)
         {
-            MessageHelper.Handle(
-                ex,
-                "Không thể lưu tùy chọn ghi nhớ tài khoản.");
+            MessageHelper.Handle(ex, "Không thể lưu tùy chọn ghi nhớ tài khoản.");
         }
     }
 
-    private sealed class LoginBrandPanel : Panel
+    private sealed class LoginCard : Panel
     {
-        public LoginBrandPanel()
+        public LoginCard()
+        {
+            DoubleBuffered = true;
+            BackColor = CardColor;
+            Padding = Padding.Empty;
+        }
+
+        public void ApplyRoundedRegion()
+        {
+            if (Width <= 0 || Height <= 0)
+                return;
+
+            using var path = CreateRoundPath(
+                new Rectangle(0, 0, Width, Height),
+                22);
+
+            Region = new Region(path);
+            Invalidate();
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            ApplyRoundedRegion();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            using var path = CreateRoundPath(
+                new Rectangle(1, 1, Width - 3, Height - 3),
+                22);
+
+            using var pen = new Pen(Color.FromArgb(44, 59, 81), 1);
+
+            e.Graphics.DrawPath(pen, path);
+        }
+    }
+
+    private sealed class RoundedInput : Panel
+    {
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color FillColor { get; set; } = InputBackground;
+
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color BorderColor { get; set; } = InputBorder;
+
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public int Radius { get; set; } = 12;
+
+        public RoundedInput()
+        {
+            DoubleBuffered = true;
+            ResizeRedraw = true;
+            BackColor = FillColor;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            var bounds = new Rectangle(0, 0, Width - 1, Height - 1);
+
+            using var path = CreateRoundPath(bounds, Radius);
+            using var brush = new SolidBrush(FillColor);
+            using var pen = new Pen(BorderColor, 1);
+
+            e.Graphics.FillPath(brush, path);
+            e.Graphics.DrawPath(pen, path);
+        }
+    }
+
+    private sealed class RoundedButton : Button
+    {
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public int Radius { get; set; } = 12;
+
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color HoverColor { get; set; } = AccentHover;
+
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color PressedColor { get; set; } = Color.FromArgb(213, 125, 40);
+
+        private bool _hovered;
+        private bool _pressed;
+
+        public RoundedButton()
+        {
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            UseVisualStyleBackColor = false;
+            DoubleBuffered = true;
+            ResizeRedraw = true;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            _hovered = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _hovered = false;
+            _pressed = false;
+            Invalidate();
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+
+            if (e.Button == MouseButtons.Left)
+            {
+                _pressed = true;
+                Invalidate();
+            }
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            _pressed = false;
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            var bounds = new Rectangle(0, 0, Width - 1, Height - 1);
+
+            using var path = CreateRoundPath(bounds, Radius);
+            using var brush = new SolidBrush(
+                _pressed ? PressedColor : _hovered ? HoverColor : BackColor);
+
+            e.Graphics.FillPath(brush, path);
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                Text,
+                Font,
+                bounds,
+                Enabled ? ForeColor : Color.Gray,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        }
+    }
+
+    private sealed class LoginBackdrop : Panel
+    {
+        private Rectangle _shadowBounds;
+
+        public LoginBackdrop()
         {
             DoubleBuffered = true;
             ResizeRedraw = true;
             BackColor = Background;
+        }
+
+        public void SetShadowBounds(Rectangle bounds)
+        {
+            _shadowBounds = bounds;
+            Invalidate();
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -498,7 +628,6 @@ public partial class frmLogin : Form
             base.OnPaint(e);
 
             var g = e.Graphics;
-
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
             var rect = ClientRectangle;
@@ -506,79 +635,95 @@ public partial class frmLogin : Form
             if (rect.Width <= 0 || rect.Height <= 0)
                 return;
 
-            using var backgroundBrush =
-                new LinearGradientBrush(
-                    rect,
-                    ThemeHelper.PrimaryDark,
-                    ThemeHelper.Structural,
-                    LinearGradientMode.ForwardDiagonal);
+            using var gradient = new LinearGradientBrush(
+                rect,
+                BackgroundTop,
+                BackgroundBottom,
+                LinearGradientMode.Vertical);
 
-            g.FillRectangle(
-                backgroundBrush,
-                rect);
+            g.FillRectangle(gradient, rect);
 
-            using var watermarkFont = new Font(
-                "Segoe UI",
-                125F,
-                FontStyle.Bold);
+            using var vignette = new SolidBrush(Color.FromArgb(18, 0, 0, 0));
+            g.FillRectangle(vignette, rect);
 
-            using var watermarkBrush = new SolidBrush(
-                Color.FromArgb(12, ThemeHelper.Accent));
+            for (var layer = 10; layer >= 1; layer--)
+            {
+                var shadowRect = _shadowBounds;
+                shadowRect.Inflate(layer * 2, layer * 2);
+                shadowRect.Offset(0, layer);
+
+                using var shadowPath = CreateRoundPath(shadowRect, 24 + layer);
+                using var shadowBrush = new SolidBrush(
+                    Color.FromArgb(5 + layer * 2, Color.Black));
+
+                g.FillPath(shadowBrush, shadowPath);
+            }
+
+            using var ringPen = new Pen(Color.FromArgb(35, Accent), 1.4F);
+
+            for (var i = 0; i < 6; i++)
+            {
+                var diameter = 165 + i * 35;
+
+                g.DrawEllipse(
+                    ringPen,
+                    rect.Width - diameter / 2 - 18,
+                    30 - diameter / 2,
+                    diameter,
+                    diameter);
+            }
+
+            using var glow = new SolidBrush(Color.FromArgb(23, Accent));
+
+            g.FillEllipse(glow, -115, rect.Height - 245, 340, 310);
+            g.FillEllipse(glow, rect.Width - 175, rect.Height - 115, 280, 230);
+
+            using var watermarkFont = new Font("Segoe UI", 160F, FontStyle.Bold);
+            using var watermarkBrush = new SolidBrush(Color.FromArgb(10, Color.White));
 
             g.DrawString(
                 "C",
                 watermarkFont,
                 watermarkBrush,
-                new PointF(
-                    rect.Width - 180,
-                    rect.Height - 250));
+                new PointF(rect.Width - 180, rect.Height - 190));
 
-            int centerX = rect.Width - 70;
-            int centerY = 100;
+            using var linePen = new Pen(Color.FromArgb(38, Accent), 2F);
 
-            using var ringPen = new Pen(
-                Color.FromArgb(16, ThemeHelper.Accent),
-                2F);
-
-            for (int i = 0; i < 4; i++)
+            for (var i = 0; i < 8; i++)
             {
-                int size = 120 + i * 55;
+                var x = 24 + i * 22;
 
-                g.DrawEllipse(
-                    ringPen,
-                    centerX - size / 2,
-                    centerY - size / 2,
-                    size,
-                    size);
+                g.DrawLine(linePen, x, 22, x + 9, 36);
+                g.DrawLine(linePen, x, rect.Height - 37, x + 9, rect.Height - 22);
             }
-
-            using var glowBrush = new SolidBrush(
-                Color.FromArgb(18, ThemeHelper.Accent));
-
-            g.FillEllipse(
-                glowBrush,
-                -120,
-                rect.Height - 180,
-                400,
-                300);
-
-            using var accentBrush =
-                new LinearGradientBrush(
-                    new Rectangle(
-                        0,
-                        0,
-                        rect.Width,
-                        3),
-                    ThemeHelper.Accent,
-                    ThemeHelper.AccentHover,
-                    LinearGradientMode.Horizontal);
-
-            g.FillRectangle(
-                accentBrush,
-                0,
-                0,
-                rect.Width,
-                3);
+            
         }
+    }
+
+    private static GraphicsPath CreateRoundPath(Rectangle bounds, int radius)
+    {
+        var path = new GraphicsPath();
+
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+            return path;
+
+        var diameter = Math.Min(radius * 2, Math.Min(bounds.Width, bounds.Height));
+
+        var arc = new Rectangle(bounds.X, bounds.Y, diameter, diameter);
+
+        path.AddArc(arc, 180, 90);
+
+        arc.X = bounds.Right - diameter;
+        path.AddArc(arc, 270, 90);
+
+        arc.Y = bounds.Bottom - diameter;
+        path.AddArc(arc, 0, 90);
+
+        arc.X = bounds.X;
+        path.AddArc(arc, 90, 90);
+
+        path.CloseFigure();
+
+        return path;
     }
 }

@@ -10,7 +10,8 @@ public interface IBookingService
         int showtimeId,
         List<int> seatIds,
         List<BookingProduct> products,
-        PaymentMethod paymentMethod);
+        PaymentMethod paymentMethod,
+        string? promotionCode = null);
 
     List<Booking> GetBookingHistory(int customerId);
 

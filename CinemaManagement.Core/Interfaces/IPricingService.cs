@@ -12,6 +12,8 @@ public interface IPricingService
 
     void DeleteRule(int id);
 
+    decimal CalculateTicketPrice(Showtime showtime, Seat seat);
+
     decimal CalculateFinalTicketPrice(
         decimal basePrice,
         DateTime showTime,

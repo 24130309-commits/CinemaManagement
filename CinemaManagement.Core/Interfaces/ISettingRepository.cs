@@ -7,5 +7,6 @@ public partial interface ISettingRepository
 {
     string Get(string key);
     void Set(string key, string value);
+    void SetMany(IEnumerable<AppSetting> settings);
     IEnumerable<AppSetting> GetAll();
 }

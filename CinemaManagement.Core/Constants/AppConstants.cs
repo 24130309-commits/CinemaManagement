@@ -4,7 +4,6 @@ public static class AppConstants
 {
     public const string DatabaseFileName = "CinemaManagement.db";
     public const string DatabaseDirectoryName = "CinemaManagement";
-    public const string ConnectionString = "Data Source=CinemaManagement.db;";
 
     public const string PosterDirectoryName = "Resources/Posters";
 

@@ -1,6 +1,6 @@
 
 using Microsoft.Data.Sqlite;
-using CinemaManagement.Core.Constants;
+using CinemaManagement.Core.Storage;
 
 namespace CinemaManagement.DAL.Database;
 
@@ -12,14 +12,14 @@ public sealed class SqliteConnectionFactory
 
     public SqliteConnectionFactory(string? databasePath = null)
     {
-        var root = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            AppConstants.DatabaseDirectoryName);
-
-        Directory.CreateDirectory(root);
-
-        DatabasePath = Path.GetFullPath(
-            databasePath ?? Path.Combine(root, AppConstants.DatabaseFileName));
+        if (!string.IsNullOrWhiteSpace(databasePath))
+        {
+            DatabasePath = Path.GetFullPath(databasePath);
+        }
+        else
+        {
+            DatabasePath = StoragePathResolver.DatabasePath;
+        }
 
         var directory = Path.GetDirectoryName(DatabasePath);
 
@@ -29,13 +29,16 @@ public sealed class SqliteConnectionFactory
         }
     }
 
-    private SqliteConnectionFactory(string connectionString, bool isConnectionString)
+    private SqliteConnectionFactory(
+        string connectionString,
+        bool useConnectionString)
     {
         _connectionString = connectionString;
         DatabasePath = string.Empty;
     }
 
-    public static SqliteConnectionFactory FromConnectionString(string connectionString)
+    public static SqliteConnectionFactory FromConnectionString(
+        string connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {
@@ -65,14 +68,26 @@ public sealed class SqliteConnectionFactory
         }
 
         var connection = new SqliteConnection(connectionString);
-        connection.Open();
 
-        using var command = connection.CreateCommand();
-        command.CommandText =
-            "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 30000;";
+        try
+        {
+            connection.Open();
 
-        command.ExecuteNonQuery();
+            using var command = connection.CreateCommand();
 
-        return connection;
+            command.CommandText = """
+                PRAGMA foreign_keys = ON;
+                PRAGMA busy_timeout = 30000;
+                """;
+
+            command.ExecuteNonQuery();
+
+            return connection;
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
     }
 }

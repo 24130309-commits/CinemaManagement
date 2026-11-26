@@ -1,9 +1,34 @@
-﻿namespace CinemaManagement.UI.Forms.Sales;
+﻿using CinemaManagement.Core.DTOs;
+using CinemaManagement.Core.Entities;
 
-public partial class SalesOrderContext : Form
+namespace CinemaManagement.UI.Forms.Sales;
+
+public sealed class SalesOrderContext
 {
-    public SalesOrderContext()
+    public Showtime? Showtime { get; set; }
+    public Customer? Customer { get; set; }
+    public List<int> SelectedSeatIds { get; } = new();
+    public Dictionary<int, int> HoldIds { get; } = new();
+    public List<BookingProduct> Products { get; } = new();
+    public Dictionary<int, string> ProductNames { get; } = new();
+    public int BookingId { get; set; }
+    public string PromotionCode { get; set; } = string.Empty;
+    public decimal Discount { get; set; }
+
+    public bool HasSelectedSeats => SelectedSeatIds.Count > 0;
+
+    public decimal ProductTotal => Products.Sum(item => item.Price * item.Quantity);
+
+    public void Reset()
     {
-        InitializeComponent();
+        Showtime = null;
+        Customer = null;
+        SelectedSeatIds.Clear();
+        HoldIds.Clear();
+        Products.Clear();
+        ProductNames.Clear();
+        BookingId = 0;
+        PromotionCode = string.Empty;
+        Discount = 0;
     }
 }

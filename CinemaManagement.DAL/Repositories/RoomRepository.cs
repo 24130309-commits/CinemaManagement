@@ -77,6 +77,25 @@ public sealed class RoomRepository
             });
     }
 
+    public bool HasShowtimes(int roomId)
+    {
+        if (roomId <= 0)
+            return false;
+
+        using var connection = ConnectionFactory.CreateConnection();
+
+        return connection.ExecuteScalar<bool>(
+            """
+            SELECT EXISTS
+            (
+                SELECT 1
+                FROM Showtimes
+                WHERE RoomId = @RoomId
+            );
+            """,
+            new { RoomId = roomId });
+    }
+
     public override int Insert(Room room)
     {
         ArgumentNullException.ThrowIfNull(room);

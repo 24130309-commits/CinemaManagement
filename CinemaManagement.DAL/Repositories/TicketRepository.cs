@@ -1,81 +1,102 @@
+
+using Dapper;
 using CinemaManagement.Core.Entities;
+using CinemaManagement.Core.Enums;
 using CinemaManagement.Core.Interfaces;
-using Microsoft.Data.Sqlite;
+using CinemaManagement.DAL.Database;
 
 namespace CinemaManagement.DAL.Repositories;
 
-public class TicketRepository : ITicketRepository
+public sealed class TicketRepository : ITicketRepository
 {
-    private readonly string _connectionString;
+    private readonly SqliteConnectionFactory _factory;
 
-    public TicketRepository(string connectionString = "Data Source=cinema.db")
+    public TicketRepository(SqliteConnectionFactory factory)
     {
-        _connectionString = connectionString;
+        _factory = factory
+            ?? throw new ArgumentNullException(nameof(factory));
     }
 
     public List<Ticket> GetByBookingId(int bookingId)
     {
-        var list = new List<Ticket>();
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        if (bookingId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(bookingId));
 
-        var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT Id, BookingId, ShowTimeId, SeatId, Price FROM Tickets WHERE BookingId = @BookingId";
-        cmd.Parameters.AddWithValue("@BookingId", bookingId);
+        using var connection = _factory.CreateConnection();
 
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            list.Add(MapTicket(reader));
-        }
-        return list;
+        return connection.Query<Ticket>(
+            """
+            SELECT
+                Id,
+                BookingId,
+                ShowtimeId,
+                SeatId,
+                Price,
+                Status,
+                QrCode
+            FROM Tickets
+            WHERE BookingId = @BookingId
+            ORDER BY Id;
+            """,
+            new { BookingId = bookingId }).AsList();
     }
 
     public List<Ticket> GetByShowTimeId(int showtimeId)
     {
-        var list = new List<Ticket>();
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        if (showtimeId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(showtimeId));
 
-        var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT Id, BookingId, ShowTimeId, SeatId, Price FROM Tickets WHERE ShowTimeId = @ShowTimeId";
-        cmd.Parameters.AddWithValue("@ShowTimeId", showtimeId);
+        using var connection = _factory.CreateConnection();
 
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            list.Add(MapTicket(reader));
-        }
-        return list;
+        return connection.Query<Ticket>(
+            """
+            SELECT
+                t.Id,
+                t.BookingId,
+                t.ShowtimeId,
+                t.SeatId,
+                t.Price,
+                t.Status,
+                t.QrCode
+            FROM Tickets t
+            INNER JOIN Bookings b ON b.Id = t.BookingId
+            WHERE t.ShowtimeId = @ShowtimeId
+              AND t.Status = 'Active'
+              AND b.Status = @PaidStatus
+            ORDER BY t.SeatId;
+            """,
+            new
+            {
+                ShowtimeId = showtimeId,
+                PaidStatus = (int)BookingStatus.Paid
+            }).AsList();
     }
 
     public bool IsSeatBooked(int showtimeId, int seatId)
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        if (showtimeId <= 0 || seatId <= 0)
+            return false;
 
-        var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
-            SELECT COUNT(1)
-            FROM Tickets t
-            INNER JOIN Bookings b ON t.BookingId = b.Id
-            WHERE t.ShowTimeId = @ShowTimeId AND t.SeatId = @SeatId AND b.Status != 'Canceled'";
-        cmd.Parameters.AddWithValue("@ShowTimeId", showtimeId);
-        cmd.Parameters.AddWithValue("@SeatId", seatId);
+        using var connection = _factory.CreateConnection();
 
-        long count = (long)(cmd.ExecuteScalar() ?? 0L);
-        return count > 0;
-    }
-
-    private static Ticket MapTicket(SqliteDataReader reader)
-    {
-        return new Ticket
-        {
-            Id = reader.GetInt32(0),
-            BookingId = reader.GetInt32(1),
-            ShowTimeId = reader.GetInt32(2),
-            SeatId = reader.GetInt32(3),
-            Price = reader.GetDecimal(4)
-        };
+        return connection.ExecuteScalar<bool>(
+            """
+            SELECT EXISTS
+            (
+                SELECT 1
+                FROM Tickets t
+                INNER JOIN Bookings b ON b.Id = t.BookingId
+                WHERE t.ShowtimeId = @ShowtimeId
+                  AND t.SeatId = @SeatId
+                  AND t.Status = 'Active'
+                  AND b.Status = @PaidStatus
+            );
+            """,
+            new
+            {
+                ShowtimeId = showtimeId,
+                SeatId = seatId,
+                PaidStatus = (int)BookingStatus.Paid
+            });
     }
 }

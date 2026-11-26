@@ -38,23 +38,30 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
 
         using var connection = ConnectionFactory.CreateConnection();
 
-        return connection.ExecuteScalar<long>(
+        return connection.ExecuteScalar<bool>(
             """
-            SELECT COUNT(1)
-            FROM Users
-            WHERE Username = @Username COLLATE NOCASE
-              AND (@ExcludeId IS NULL OR Id <> @ExcludeId);
+            SELECT EXISTS
+            (
+                SELECT 1
+                FROM Users
+                WHERE Username = @Username COLLATE NOCASE
+                  AND (@ExcludeId IS NULL OR Id <> @ExcludeId)
+            );
             """,
             new
             {
                 Username = username.Trim(),
                 ExcludeId = excludeId
-            }) > 0;
+            });
     }
 
     public override int Insert(User user)
     {
         ArgumentNullException.ThrowIfNull(user);
+        ValidateUser(user);
+
+        if (IsUsernameExists(user.Username))
+            throw new InvalidOperationException("Tên đăng nhập đã tồn tại.");
 
         using var connection = ConnectionFactory.CreateConnection();
 
@@ -85,10 +92,10 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
             """,
             new
             {
-                user.Username,
+                Username = user.Username.Trim(),
                 user.PasswordHash,
-                user.FullName,
-                user.Email,
+                FullName = user.FullName.Trim(),
+                Email = user.Email?.Trim() ?? string.Empty,
                 Role = (int)user.Role,
                 IsActive = user.IsActive ? 1 : 0,
                 CreatedAt = user.CreatedAt.ToString("O")
@@ -98,6 +105,14 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
     public override bool Update(User user)
     {
         ArgumentNullException.ThrowIfNull(user);
+
+        if (user.Id <= 0)
+            return false;
+
+        ValidateUser(user);
+
+        if (IsUsernameExists(user.Username, user.Id))
+            throw new InvalidOperationException("Tên đăng nhập đã tồn tại.");
 
         using var connection = ConnectionFactory.CreateConnection();
 
@@ -114,9 +129,9 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
             new
             {
                 user.Id,
-                user.Username,
-                user.FullName,
-                user.Email,
+                Username = user.Username.Trim(),
+                FullName = user.FullName.Trim(),
+                Email = user.Email?.Trim() ?? string.Empty,
                 Role = (int)user.Role,
                 IsActive = user.IsActive ? 1 : 0
             }) > 0;
@@ -124,7 +139,35 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
 
     public override bool Delete(int id)
     {
+        if (id <= 0)
+            return false;
+
         using var connection = ConnectionFactory.CreateConnection();
+
+        var hasAuditLogs = connection.ExecuteScalar<bool>(
+            """
+            SELECT EXISTS
+            (
+                SELECT 1
+                FROM AuditLogs
+                WHERE UserId = @Id
+            );
+            """,
+            new { Id = id });
+
+        var hasBookings = connection.ExecuteScalar<bool>(
+            """
+            SELECT EXISTS
+            (
+                SELECT 1
+                FROM Bookings
+                WHERE UserId = @Id
+            );
+            """,
+            new { Id = id });
+
+        if (hasAuditLogs || hasBookings)
+            return false;
 
         return connection.Execute(
             """
@@ -136,6 +179,9 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
 
     public bool UpdatePassword(int id, string newHash)
     {
+        if (id <= 0)
+            return false;
+
         if (string.IsNullOrWhiteSpace(newHash))
         {
             throw new ArgumentException(
@@ -160,6 +206,9 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
 
     public bool SetActive(int id, bool isActive)
     {
+        if (id <= 0)
+            return false;
+
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Execute(
@@ -173,5 +222,20 @@ public sealed class UserRepository : BaseRepository<User>, IUserRepository
                 Id = id,
                 IsActive = isActive ? 1 : 0
             }) > 0;
+    }
+
+    private static void ValidateUser(User user)
+    {
+        if (string.IsNullOrWhiteSpace(user.Username))
+            throw new ArgumentException("Tên đăng nhập không được để trống.");
+
+        if (string.IsNullOrWhiteSpace(user.PasswordHash))
+            throw new ArgumentException("Mật khẩu đã mã hóa không được để trống.");
+
+        if (string.IsNullOrWhiteSpace(user.FullName))
+            throw new ArgumentException("Họ tên nhân viên không được để trống.");
+
+        if (!Enum.IsDefined(user.Role))
+            throw new ArgumentException("Vai trò tài khoản không hợp lệ.");
     }
 }

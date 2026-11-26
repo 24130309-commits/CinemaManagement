@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Enums;
 using CinemaManagement.Core.Interfaces;
+using CinemaManagement.UI.Controls;
 using CinemaManagement.UI.Helpers;
 
 namespace CinemaManagement.UI.Forms.Management;
@@ -15,11 +16,11 @@ public partial class frmUserManage : Form
     private readonly IUserService _users;
     private readonly IAuditService _audit;
 
-    private readonly DataGridView _grid = new()
+    private readonly EmptyStateDataGridView _grid = new()
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
-        AutoGenerateColumns = true,
+        AutoGenerateColumns = false,
         AllowUserToAddRows = false,
         SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         MultiSelect = false,
@@ -40,23 +41,19 @@ public partial class frmUserManage : Form
         MinimumSize = new Size(900, 550);
         Size = new Size(1050, 650);
 
+        var title = new PageHeader(
+            "Nhân viên & tài khoản",
+            "Quản lý quyền truy cập, thông tin nhân viên và trạng thái tài khoản.");
+
         var bar = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 66,
+            Height = 88,
             Padding = new Padding(14, 10, 10, 8),
-            WrapContents = false,
+            WrapContents = true,
+            AutoScroll = true,
             BackColor = ThemeHelper.Surface
         };
-
-        bar.Controls.Add(new Label
-        {
-            Text = "QUẢN LÝ NHÂN VIÊN",
-            AutoSize = true,
-            Font = ThemeHelper.SectionFont,
-            ForeColor = ThemeHelper.Primary,
-            Padding = new Padding(0, 8, 14, 0)
-        });
 
         AddButton(bar, "Thêm nhân viên", AddUser);
         AddButton(bar, "Sửa thông tin", EditUser);
@@ -64,30 +61,39 @@ public partial class frmUserManage : Form
         AddButton(bar, "Khóa / Mở khóa", ToggleActive);
         AddButton(bar, "Làm mới", (_, _) => LoadUsers());
 
+        ConfigureGridColumns();
         Controls.Add(_grid);
         Controls.Add(bar);
+        Controls.Add(title);
+        _grid.EmptyStateText = "Chưa có tài khoản nhân viên để hiển thị.";
 
         _grid.CellFormatting += (_, e) =>
         {
-            if (e.RowIndex < 0 ||
-                e.ColumnIndex < 0 ||
-                _grid.Columns[e.ColumnIndex].Name != "IsActive" ||
-                e.Value is not bool active)
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
             {
                 return;
             }
 
-            e.Value = active ? "Đang hoạt động" : "Đã khóa";
-            e.CellStyle.ForeColor = active
-                ? ThemeHelper.Success
-                : ThemeHelper.Danger;
+            var columnName = _grid.Columns[e.ColumnIndex].Name;
+            if (columnName == nameof(User.IsActive) && e.Value is bool active)
+            {
+                e.Value = active ? "Đang hoạt động" : "Đã khóa";
+                e.CellStyle.ForeColor = active ? ThemeHelper.Success : ThemeHelper.Danger;
+                e.CellStyle.BackColor = active ? ThemeHelper.SuccessSoft : ThemeHelper.DangerSoft;
+                e.CellStyle.Font = ThemeHelper.SectionFont;
+                e.FormattingApplied = true;
+            }
+            else if (columnName == nameof(User.Role) && e.Value is UserRole role)
+            {
+                e.Value = role switch
+                {
+                    UserRole.Admin => "Quản trị viên",
+                    UserRole.Manager => "Quản lý",
+                    _ => "Nhân viên"
+                };
 
-            e.CellStyle.Font = new Font(
-                "Segoe UI",
-                9f,
-                FontStyle.Bold);
-
-            e.FormattingApplied = true;
+                e.FormattingApplied = true;
+            }
         };
 
         Load += (_, _) => LoadUsers();
@@ -120,14 +126,6 @@ public partial class frmUserManage : Form
         try
         {
             _grid.DataSource = _users.GetAllUsers().ToList();
-
-            SetColumn("Id", "Mã nhân viên", false);
-            SetColumn("Username", "Tên đăng nhập");
-            SetColumn("FullName", "Họ và tên");
-            SetColumn("Email", "Email");
-            SetColumn("Role", "Vai trò");
-            SetColumn("IsActive", "Trạng thái");
-            SetColumn("PasswordHash", "Mật khẩu", false);
         }
         catch (Exception ex)
         {
@@ -135,16 +133,35 @@ public partial class frmUserManage : Form
         }
     }
 
-    private void SetColumn(
-        string name,
-        string header,
-        bool visible = true)
+    private void ConfigureGridColumns()
     {
-        if (!_grid.Columns.Contains(name))
-            return;
+        AddTextColumn(nameof(User.Username), "Tên đăng nhập", 17);
+        AddTextColumn(nameof(User.FullName), "Họ và tên", 23);
+        AddTextColumn(nameof(User.Email), "Email", 22);
+        AddTextColumn(nameof(User.Role), "Vai trò", 15);
+        AddTextColumn(nameof(User.IsActive), "Trạng thái", 15);
+        AddTextColumn(nameof(User.CreatedAt), "Ngày tạo", 16, "dd/MM/yyyy");
+    }
 
-        _grid.Columns[name]!.HeaderText = header;
-        _grid.Columns[name]!.Visible = visible;
+    private void AddTextColumn(
+        string propertyName,
+        string header,
+        float fillWeight,
+        string? format = null)
+    {
+        var column = new DataGridViewTextBoxColumn
+        {
+            Name = propertyName,
+            DataPropertyName = propertyName,
+            HeaderText = header,
+            FillWeight = fillWeight,
+            MinimumWidth = 80
+        };
+
+        if (format is not null)
+            column.DefaultCellStyle.Format = format;
+
+        _grid.Columns.Add(column);
     }
 
     private void AddUser(object? sender, EventArgs e)
@@ -225,6 +242,7 @@ public partial class frmUserManage : Form
         }
 
         var password = Prompt.Show(
+            this,
             "Nhập mật khẩu mới (ít nhất 8 ký tự, có chữ hoa, chữ thường và số):",
             "Đặt lại mật khẩu");
 
@@ -300,40 +318,63 @@ public partial class frmUserManage : Form
                 ? "Thêm nhân viên"
                 : "Sửa nhân viên";
 
-            Size = new Size(440, 390);
-            MinimumSize = new Size(440, 390);
+            Size = new Size(520, source is null ? 520 : 430);
+            MinimumSize = new Size(480, source is null ? 460 : 400);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
+            BackColor = ThemeHelper.Background;
+            Font = ThemeHelper.BodyFont;
+            AccessibleRole = AccessibleRole.Dialog;
+            AccessibleName = Text;
 
-            AddField("Tên đăng nhập", _username, 25);
-            AddField("Họ và tên", _fullName, 95);
+            var root = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Padding = new Padding(16),
+                BackColor = ThemeHelper.Background
+            };
+            root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+            root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+
+            var heading = new PageHeader(
+                source is null ? "Thêm nhân viên" : "Sửa thông tin nhân viên",
+                "Thông tin tài khoản và quyền truy cập.");
+
+            var fields = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                ColumnCount = 1,
+                RowCount = source is null ? 4 : 3,
+                Padding = new Padding(10, 14, 10, 8),
+                BackColor = ThemeHelper.Surface
+            };
+            fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+            fields.Controls.Add(CreateEditorField("Tên đăng nhập", _username), 0, 0);
+            fields.Controls.Add(CreateEditorField("Họ và tên", _fullName), 0, 1);
 
             if (source is null)
             {
-                AddField("Mật khẩu ban đầu", _password, 165);
                 _password.UseSystemPasswordChar = true;
+                _password.AccessibleName = "Mật khẩu ban đầu";
+                _password.AccessibleDescription = "Nhập mật khẩu ban đầu cho tài khoản mới.";
+                fields.Controls.Add(CreateEditorField("Mật khẩu ban đầu", _password), 0, 2);
             }
 
-            _role.SetBounds(
-                25,
-                source is null ? 245 : 175,
-                370,
-                32);
-
             _role.DataSource = Enum.GetValues<UserRole>();
-
-            Controls.Add(_role);
-
-            Controls.Add(new Label
-            {
-                Text = "Vai trò",
-                Location = new Point(
-                    25,
-                    source is null ? 222 : 152),
-                AutoSize = true
-            });
+            _role.SelectedItem = source?.Role ?? UserRole.Staff;
+            _role.AccessibleName = "Vai trò tài khoản";
+            fields.Controls.Add(
+                CreateEditorField("Vai trò", _role),
+                0,
+                source is null ? 3 : 2);
 
             if (source is not null)
             {
@@ -341,17 +382,22 @@ public partial class frmUserManage : Form
                 _fullName.Text = source.FullName;
                 _role.SelectedItem = source.Role;
             }
-            else
+            var footer = new FlowLayoutPanel
             {
-                _role.SelectedItem = UserRole.Staff;
-            }
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
+                Padding = new Padding(0, 10, 0, 0),
+                BackColor = ThemeHelper.Background
+            };
 
             var ok = new Button
             {
                 Text = "Lưu",
-                Location = new Point(235, 300),
-                Size = new Size(75, 36)
+                Size = new Size(110, 38),
+                Margin = new Padding(6, 0, 0, 0)
             };
+            ThemeHelper.StyleActionButton(ok, ThemeHelper.ActionButtonRole.Primary);
 
             ok.Click += (_, _) =>
             {
@@ -395,16 +441,16 @@ public partial class frmUserManage : Form
             var cancel = new Button
             {
                 Text = "Hủy",
-                Location = new Point(320, 300),
-                Size = new Size(75, 36),
+                Size = new Size(110, 38),
                 DialogResult = DialogResult.Cancel
             };
+            ThemeHelper.StyleActionButton(cancel, ThemeHelper.ActionButtonRole.Secondary);
 
-            Controls.AddRange(new Control[]
-            {
-                ok,
-                cancel
-            });
+            footer.Controls.AddRange([ok, cancel]);
+            root.Controls.Add(heading, 0, 0);
+            root.Controls.Add(fields, 0, 1);
+            root.Controls.Add(footer, 0, 2);
+            Controls.Add(root);
 
             AcceptButton = ok;
             CancelButton = cancel;
@@ -412,77 +458,148 @@ public partial class frmUserManage : Form
             ThemeHelper.Apply(this);
         }
 
-        private void AddField(
+        private static Control CreateEditorField(
             string title,
-            TextBox box,
-            int y)
+            Control input)
         {
-            Controls.Add(new Label
+            var field = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 72,
+                ColumnCount = 1,
+                RowCount = 2,
+                Margin = new Padding(2, 2, 2, 6),
+                BackColor = ThemeHelper.Surface
+            };
+            field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            field.RowStyles.Add(new RowStyle(SizeType.Absolute, 25));
+            field.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+            var label = new Label
             {
                 Text = title,
-                Location = new Point(25, y),
-                AutoSize = true
-            });
+                Dock = DockStyle.Fill,
+                ForeColor = ThemeHelper.Text,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
 
-            box.SetBounds(25, y + 25, 370, 30);
-            Controls.Add(box);
+            input.Dock = DockStyle.Fill;
+            input.Margin = new Padding(0, 2, 0, 6);
+            field.Controls.Add(label, 0, 0);
+            field.Controls.Add(input, 0, 1);
+            return field;
         }
     }
 
     private static class Prompt
     {
-        public static string? Show(string text, string title)
+        public static string? Show(Form owner, string text, string title)
         {
             using var form = new Form
             {
                 Text = title,
-                Size = new Size(430, 180),
+                Size = new Size(560, 300),
+                MinimumSize = new Size(500, 270),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
-                MinimizeBox = false
+                MinimizeBox = false,
+                ShowInTaskbar = false,
+                BackColor = ThemeHelper.Background,
+                Font = ThemeHelper.BodyFont,
+                AccessibleRole = AccessibleRole.Dialog,
+                AccessibleName = title
             };
+
+            var root = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Padding = new Padding(16),
+                BackColor = ThemeHelper.Background
+            };
+            root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+            root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
+
+            var header = new PageHeader(
+                title,
+                "Nhập thông tin xác thực mới cho tài khoản đã chọn.");
+
+            var content = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2,
+                Padding = new Padding(14, 12, 14, 8),
+                BackColor = ThemeHelper.Surface
+            };
+            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            content.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
+            content.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
 
             var label = new Label
             {
                 Text = text,
-                Location = new Point(15, 15),
-                Size = new Size(380, 40)
+                Dock = DockStyle.Fill,
+                ForeColor = ThemeHelper.Text,
+                AutoEllipsis = true,
+                AccessibleRole = AccessibleRole.StaticText
             };
 
             var input = new TextBox
             {
-                Location = new Point(15, 60),
-                Width = 380,
-                UseSystemPasswordChar = true
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 4, 0, 8),
+                UseSystemPasswordChar = true,
+                AccessibleName = "Mật khẩu mới",
+                AccessibleDescription = "Nhập mật khẩu mới cho tài khoản đã chọn."
+            };
+
+            content.Controls.Add(label, 0, 0);
+            content.Controls.Add(input, 0, 1);
+
+            var footer = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
+                Padding = new Padding(0, 10, 0, 0),
+                BackColor = ThemeHelper.Background
             };
 
             var ok = new Button
             {
                 Text = "Đồng ý",
                 DialogResult = DialogResult.OK,
-                Location = new Point(235, 100)
+                Size = new Size(110, 38),
+                Margin = new Padding(6, 0, 0, 0)
             };
+            ThemeHelper.StyleActionButton(ok, ThemeHelper.ActionButtonRole.Primary);
 
             var cancel = new Button
             {
                 Text = "Hủy",
                 DialogResult = DialogResult.Cancel,
-                Location = new Point(320, 100)
+                Size = new Size(90, 38)
             };
+            ThemeHelper.StyleActionButton(cancel, ThemeHelper.ActionButtonRole.Secondary);
 
-            form.Controls.AddRange(new Control[]
-            {
-                label,
-                input,
-                ok,
-                cancel
-            });
+            footer.Controls.AddRange([ok, cancel]);
+            root.Controls.Add(header, 0, 0);
+            root.Controls.Add(content, 0, 1);
+            root.Controls.Add(footer, 0, 2);
+            form.Controls.Add(root);
 
             form.AcceptButton = ok;
             form.CancelButton = cancel;
 
-            return form.ShowDialog() == DialogResult.OK
+            ThemeHelper.Apply(form);
+            ThemeHelper.FitToWorkingArea(form, new Size(560, 300), new Size(500, 270));
+
+            return form.ShowDialog(owner) == DialogResult.OK
                 ? input.Text
                 : null;
         }

@@ -1,121 +1,167 @@
-﻿using CinemaManagement.Core.DTOS;
+﻿
+using System.Net.Mail;
+using CinemaManagement.Core.DTOS;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Exceptions;
 using CinemaManagement.Core.Interfaces;
+using CinemaManagement.BLL.Session;
 
 namespace CinemaManagement.BLL.Services;
 
 public sealed class CustomerService : ICustomerService
 {
     private readonly ICustomerRepository _repository;
+    private readonly CurrentUserSession _session;
 
-    public CustomerService(ICustomerRepository repository)
+    public CustomerService(
+        ICustomerRepository repository,
+        CurrentUserSession session)
     {
-        _repository = repository;
+        _repository = repository
+            ?? throw new ArgumentNullException(nameof(repository));
+        _session = session
+            ?? throw new ArgumentNullException(nameof(session));
     }
 
     public IEnumerable<Customer> GetAll()
     {
+        AuthorizationGuard.EnsureAuthenticated(_session);
         return _repository.GetAll();
     }
 
     public IEnumerable<Customer> Search(string keyword)
     {
-        return _repository.Search(keyword);
+        AuthorizationGuard.EnsureAuthenticated(_session);
+        return _repository.Search(keyword?.Trim() ?? string.Empty);
     }
 
     public Customer? FindByPhone(string phone)
     {
-        return string.IsNullOrWhiteSpace(phone)
-            ? null
-            : _repository.GetByPhone(phone.Trim());
+        AuthorizationGuard.EnsureAuthenticated(_session);
+        if (string.IsNullOrWhiteSpace(phone))
+            return null;
+
+        return _repository.GetByPhone(phone.Trim());
     }
 
     public Customer Create(Customer customer)
     {
+        AuthorizationGuard.EnsureAuthenticated(_session);
         Validate(customer);
 
-        if (_repository.GetByPhone(customer.Phone) != null)
+        customer.FullName = customer.FullName.Trim();
+        customer.Phone = customer.Phone.Trim();
+        customer.Email = customer.Email.Trim();
+
+        if (_repository.GetByPhone(customer.Phone) is not null)
+        {
             throw new BusinessException(
                 "Số điện thoại đã được đăng ký.");
+        }
 
-        customer.Phone = customer.Phone.Trim();
-        customer.Tier = "Standard";
         customer.Points = 0;
+        customer.Tier = "Standard";
 
-        customer.Id = _repository.Insert(customer);
+        var id = _repository.Insert(customer);
 
-        if (customer.Id <= 0)
+        if (id <= 0)
             throw new BusinessException("Không thể tạo khách hàng.");
 
+        customer.Id = id;
         return customer;
     }
 
     public void Update(Customer customer)
     {
+        AuthorizationGuard.EnsureAdministrator(_session, "quản lý khách hàng");
         Validate(customer);
 
         if (customer.Id <= 0)
-            throw new BusinessException("Khách hàng không hợp lệ.");
+            throw new BusinessException("Mã khách hàng không hợp lệ.");
 
+        customer.FullName = customer.FullName.Trim();
         customer.Phone = customer.Phone.Trim();
+        customer.Email = customer.Email.Trim();
 
         var existing = _repository.GetByPhone(customer.Phone);
 
-        if (existing != null && existing.Id != customer.Id)
+        if (existing is not null && existing.Id != customer.Id)
+        {
             throw new BusinessException(
                 "Số điện thoại đã được sử dụng.");
+        }
+
+        var current = _repository.GetById(customer.Id)
+            ?? throw new BusinessException("Không tìm thấy khách hàng.");
+
+        // Điểm và hạng chỉ được thay đổi qua nghiệp vụ tích lũy.
+        customer.Points = current.Points;
+        customer.Tier = current.Tier;
 
         if (!_repository.Update(customer))
+        {
             throw new BusinessException(
                 "Không thể cập nhật khách hàng.");
+        }
     }
 
     public void AddPointsAndUpgradeTier(
         int customerId,
         int points)
     {
+        AuthorizationGuard.EnsureAdministrator(_session, "điều chỉnh điểm khách hàng");
         if (customerId <= 0 || points <= 0)
+        {
             throw new BusinessException(
                 "Mã khách hàng hoặc điểm tích lũy không hợp lệ.");
+        }
 
-        if (!_repository.AddPoints(customerId, points))
+        if (_repository.GetById(customerId) is null)
+        {
             throw new BusinessException(
                 "Không tìm thấy khách hàng.");
+        }
 
-        var customer = _repository.GetById(customerId)
-            ?? throw new BusinessException(
-                "Không tìm thấy khách hàng.");
-
-        var tier = customer.Points >= 5000
-            ? "Platinum"
-            : customer.Points >= 2000
-                ? "Gold"
-                : customer.Points >= 500
-                    ? "Silver"
-                    : "Standard";
-
-        _repository.UpdateTier(customerId, tier);
+        if (!_repository.AddPointsAndUpdateTier(customerId, points))
+        {
+            throw new BusinessException(
+                "Không thể cập nhật điểm tích lũy và hạng thành viên.");
+        }
     }
 
     public IEnumerable<CustomerPurchaseHistoryDto>
         GetPurchaseHistory(int customerId)
     {
+        AuthorizationGuard.EnsureAuthenticated(_session);
         if (customerId <= 0)
-            throw new BusinessException(
-                "Mã khách hàng không hợp lệ.");
+            throw new BusinessException("Mã khách hàng không hợp lệ.");
+
+        if (_repository.GetById(customerId) is null)
+            throw new BusinessException("Không tìm thấy khách hàng.");
 
         return _repository.GetPurchaseHistory(customerId);
     }
 
     private static void Validate(Customer customer)
     {
-        if (customer == null ||
-            string.IsNullOrWhiteSpace(customer.FullName) ||
-            string.IsNullOrWhiteSpace(customer.Phone))
+        if (customer is null)
         {
             throw new BusinessException(
-                "Họ tên và số điện thoại là bắt buộc.");
+                "Thông tin khách hàng không hợp lệ.");
+        }
+
+        if (string.IsNullOrWhiteSpace(customer.FullName) ||
+            customer.FullName.Trim().Length < 2 ||
+            customer.FullName.Trim().Length > 100)
+        {
+            throw new BusinessException(
+                "Họ tên phải có từ 2 đến 100 ký tự.");
+        }
+
+        if (string.IsNullOrWhiteSpace(customer.Phone))
+        {
+            throw new BusinessException(
+                "Số điện thoại không được để trống.");
         }
 
         var phone = customer.Phone.Trim();
@@ -124,13 +170,29 @@ public sealed class CustomerService : ICustomerService
             !phone.All(char.IsDigit))
         {
             throw new BusinessException(
-                "Số điện thoại không hợp lệ.");
+                "Số điện thoại phải gồm 9 đến 11 chữ số.");
         }
 
-        if (!string.IsNullOrWhiteSpace(customer.Email) &&
-            !customer.Email.Contains('@'))
+        if (!string.IsNullOrWhiteSpace(customer.Email))
         {
-            throw new BusinessException("Email không hợp lệ.");
+            try
+            {
+                var address = new MailAddress(customer.Email.Trim());
+
+                if (!string.Equals(
+                    address.Address,
+                    customer.Email.Trim(),
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new BusinessException(
+                        "Địa chỉ email không hợp lệ.");
+                }
+            }
+            catch (FormatException)
+            {
+                throw new BusinessException(
+                    "Địa chỉ email không hợp lệ.");
+            }
         }
     }
 }

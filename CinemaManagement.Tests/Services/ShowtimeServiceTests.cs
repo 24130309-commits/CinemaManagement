@@ -1,5 +1,6 @@
 
 using CinemaManagement.BLL.Services;
+using CinemaManagement.BLL.Session;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Enums;
 using CinemaManagement.Core.Exceptions;
@@ -129,13 +130,45 @@ public class ShowtimeServiceTests
                 .Within(TimeSpan.FromSeconds(1)));
     }
 
+    [Test]
+    public void AddShowtime_RejectsNonAdministrator()
+    {
+        var repo = new FakeShowtimeRepository();
+        var session = new CurrentUserSession();
+        session.Set(new User { Id = 3, Username = "staff", Role = UserRole.Staff });
+        var service = new ShowtimeService(
+            repo,
+            new FakeMovieRepository(),
+            new FakeRoomRepository(),
+            null,
+            session);
+
+        Assert.Throws<BusinessException>(() => service.AddShowtime(new Showtime
+        {
+            MovieId = 1,
+            RoomId = 1,
+            StartTime = DateTime.Now.AddDays(2),
+            BasePrice = 80000
+        }));
+        Assert.That(repo.Items, Is.Empty);
+    }
+
     private static ShowtimeService CreateService(
         FakeShowtimeRepository repo)
     {
         return new ShowtimeService(
             repo,
             new FakeMovieRepository(),
-            new FakeRoomRepository());
+            new FakeRoomRepository(),
+            null,
+            CreateAdminSession());
+    }
+
+    private static CurrentUserSession CreateAdminSession()
+    {
+        var session = new CurrentUserSession();
+        session.Set(new User { Id = 1, Username = "admin", Role = UserRole.Admin });
+        return session;
     }
 
     private sealed class FakeShowtimeRepository
@@ -328,6 +361,12 @@ public class ShowtimeServiceTests
         public IEnumerable<Room> GetActive()
         {
             return new[] { _room };
+        }
+
+        // Bổ sung để triển khai đầy đủ IRoomRepository
+        public bool HasShowtimes(int roomId)
+        {
+            return false;
         }
     }
 }
