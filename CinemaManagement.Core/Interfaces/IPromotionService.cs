@@ -8,6 +8,10 @@ public interface IPromotionService
 
     Promotion ValidateAndGetPromotion(string code);
 
+    Promotion Validate(string code, decimal orderTotal);
+
+    decimal ApplyDiscount(string code, decimal orderTotal);
+
     void AddPromotion(Promotion promotion);
 
     void UpdatePromotion(Promotion promotion);

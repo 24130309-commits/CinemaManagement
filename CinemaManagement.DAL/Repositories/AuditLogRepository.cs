@@ -23,18 +23,43 @@ public sealed class AuditLogRepository
     {
         ArgumentNullException.ThrowIfNull(log);
 
+        if (string.IsNullOrWhiteSpace(log.Action))
+            throw new ArgumentException("Hành động nhật ký không được để trống.");
+
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.ExecuteScalar<int>(
-            @"INSERT INTO AuditLogs
-                (UserId, Action, EntityName, EntityId, Detail, CreatedAt)
-              VALUES
-                (@UserId, @Action, @EntityName, @EntityId, @Detail, @CreatedAt);
-              SELECT last_insert_rowid();",
+            """
+            INSERT INTO AuditLogs
+            (
+                UserId,
+                Username,
+                Action,
+                EntityName,
+                EntityId,
+                Detail,
+                CreatedAt
+            )
+            VALUES
+            (
+                @UserId,
+                @Username,
+                @Action,
+                @EntityName,
+                @EntityId,
+                @Detail,
+                @CreatedAt
+            );
+
+            SELECT last_insert_rowid();
+            """,
             new
             {
                 log.UserId,
-                log.Action,
+                Username = string.IsNullOrWhiteSpace(log.Username)
+                    ? "System"
+                    : log.Username.Trim(),
+                Action = log.Action.Trim(),
                 log.EntityName,
                 log.EntityId,
                 log.Detail,
@@ -42,58 +67,67 @@ public sealed class AuditLogRepository
             });
     }
 
+    public override IEnumerable<AuditLog> GetAll()
+    {
+        using var connection = ConnectionFactory.CreateConnection();
+
+        return connection.Query<AuditLog>(
+            """
+            SELECT
+                Id,
+                UserId,
+                Username,
+                Action,
+                EntityName,
+                EntityId,
+                Detail,
+                CreatedAt
+            FROM AuditLogs
+            ORDER BY CreatedAt DESC, Id DESC;
+            """).AsList();
+    }
+
     public IEnumerable<AuditLog> Search(
         int userId,
         DateTime from,
         DateTime to)
     {
+        if (userId < 0)
+            throw new ArgumentOutOfRangeException(nameof(userId));
+
+        if (from.Date > to.Date)
+            throw new ArgumentException(
+                "Ngày bắt đầu không được sau ngày kết thúc.");
+
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Query<AuditLog>(
-            @"SELECT
+            """
+            SELECT
                 a.Id,
                 a.UserId,
-                COALESCE(u.Username, 'System') AS Username,
+                CASE
+                    WHEN COALESCE(a.Username, '') <> ''
+                        THEN a.Username
+                    ELSE COALESCE(u.Username, 'System')
+                END AS Username,
                 a.Action,
                 a.EntityName,
                 a.EntityId,
                 a.Detail,
                 a.CreatedAt
-              FROM AuditLogs a
-              LEFT JOIN Users u ON a.UserId = u.Id
-              WHERE (@userId = 0 OR a.UserId = @userId)
-                AND datetime(a.CreatedAt) >= datetime(@from)
-                AND datetime(a.CreatedAt) < datetime(@to)
-              ORDER BY a.CreatedAt DESC",
+            FROM AuditLogs a
+            LEFT JOIN Users u ON a.UserId = u.Id
+            WHERE (@UserId = 0 OR a.UserId = @UserId)
+              AND datetime(a.CreatedAt) >= datetime(@From)
+              AND datetime(a.CreatedAt) < datetime(@To)
+            ORDER BY a.CreatedAt DESC, a.Id DESC;
+            """,
             new
             {
-                userId,
-                from = from.ToString("O"),
-                to = to.Date.AddDays(1).ToString("O")
+                UserId = userId,
+                From = from.Date.ToString("O"),
+                To = to.Date.AddDays(1).ToString("O")
             }).AsList();
-    }
-
-    public IEnumerable<AuditLog> GetRecentLogs(int limit = 100)
-    {
-        if (limit < 1)
-            throw new ArgumentOutOfRangeException(nameof(limit));
-
-        using var connection = ConnectionFactory.CreateConnection();
-
-        return connection.Query<AuditLog>(
-            @"SELECT
-                a.Id,
-                a.UserId,
-                COALESCE(u.Username, 'System') AS Username,
-                a.Action,
-                a.EntityName,
-                a.EntityId,
-                a.Detail,
-                a.CreatedAt
-              FROM AuditLogs a
-              LEFT JOIN Users u ON a.UserId = u.Id
-              ORDER BY a.Id DESC
-              LIMIT @limit",
-            new { limit }).AsList();
     }
 }

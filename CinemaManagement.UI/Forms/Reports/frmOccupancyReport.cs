@@ -6,11 +6,12 @@ using System.Linq;
 using System.Windows.Forms;
 using CinemaManagement.Core.DTOs;
 using CinemaManagement.Core.Interfaces;
+using CinemaManagement.UI.Controls;
 using CinemaManagement.UI.Helpers;
 
 namespace CinemaManagement.UI.Forms.Reports;
 
-public partial class frmOccupancyReport : Form
+public partial class frmOccupancyReport : UserControl
 {
     private readonly IReportService _reports;
     private readonly IExportService _export;
@@ -30,7 +31,7 @@ public partial class frmOccupancyReport : Form
         Format = DateTimePickerFormat.Short
     };
 
-    private readonly DataGridView _grid = new()
+    private readonly EmptyStateDataGridView _grid = new()
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
@@ -67,54 +68,30 @@ public partial class frmOccupancyReport : Form
         InitializeComponent();
 
         Text = "Báo cáo tỷ lệ lấp đầy";
-        StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new Size(1000, 620);
-        Size = new Size(1150, 700);
         BackColor = ThemeHelper.Background;
 
         BuildLayout();
 
         _grid.CellFormatting += Grid_CellFormatting;
 
-        Load += (_, _) => LoadData();
+        LoadData();
 
         ThemeHelper.Apply(this);
     }
 
     private void BuildLayout()
     {
-        var heading = new Panel
-        {
-            Dock = DockStyle.Top,
-            Height = 82,
-            BackColor = ThemeHelper.Surface,
-            Padding = new Padding(22, 10, 22, 8)
-        };
-
-        heading.Controls.Add(new Label
-        {
-            Text = "BÁO CÁO TỶ LỆ LẤP ĐẦY",
-            Dock = DockStyle.Top,
-            Height = 34,
-            Font = ThemeHelper.HeadingFont,
-            ForeColor = ThemeHelper.Primary
-        });
-
-        heading.Controls.Add(new Label
-        {
-            Text = "Theo dõi hiệu suất sử dụng ghế theo từng suất chiếu.",
-            Dock = DockStyle.Top,
-            Height = 25,
-            Font = ThemeHelper.SmallFont,
-            ForeColor = ThemeHelper.Muted
-        });
+        var heading = new PageHeader(
+            "Tỷ lệ lấp đầy",
+            "Theo dõi mức sử dụng ghế theo phòng và từng suất chiếu.");
 
         var toolbar = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
             Height = 66,
             Padding = new Padding(14, 12, 10, 8),
-            WrapContents = false,
+            WrapContents = true,
+            AutoScroll = true,
             BackColor = ThemeHelper.Surface
         };
 
@@ -156,6 +133,8 @@ public partial class frmOccupancyReport : Form
 
         toolbar.Controls.Add(loadButton);
         toolbar.Controls.Add(exportButton);
+
+        _grid.EmptyStateText = "Không có dữ liệu lấp đầy trong khoảng thời gian đã chọn.";
 
         var content = new Panel
         {
@@ -210,14 +189,19 @@ public partial class frmOccupancyReport : Form
 
     private void ConfigureColumns()
     {
-        SetColumn(nameof(OccupancyDto.ShowtimeId), "Mã suất chiếu");
-        SetColumn(nameof(OccupancyDto.MovieTitle), "Tên phim");
-        SetColumn(nameof(OccupancyDto.Date), "Ngày chiếu", "dd/MM/yyyy");
-        SetColumn(nameof(OccupancyDto.StartTime), "Giờ bắt đầu");
-        SetColumn(nameof(OccupancyDto.TotalSeats), "Tổng số ghế", "N0");
-        SetColumn(nameof(OccupancyDto.SoldSeats), "Ghế đã bán", "N0");
-        SetColumn(nameof(OccupancyDto.OccupancyRate), "Tỷ lệ lấp đầy (%)", "N1");
-        SetColumn(nameof(OccupancyDto.TotalPrice), "Doanh thu", "N0");
+        // Set fixed widths while the grid is in fixed-width mode. Setting Width
+        // under Fill mode only changes FillWeight, leaving compact columns clipped.
+        _grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+
+        SetColumn(nameof(OccupancyDto.ShowtimeId), "Mã suất chiếu", visible: false);
+        SetColumn(nameof(OccupancyDto.MovieTitle), "Tên phim", width: 170);
+        SetColumn(nameof(OccupancyDto.RoomName), "Phòng", width: 110);
+        SetColumn(nameof(OccupancyDto.Date), "Ngày / giờ", "dd/MM HH:mm", width: 110);
+        SetColumn(nameof(OccupancyDto.StartTime), "Giờ bắt đầu", "HH:mm", visible: false);
+        SetColumn(nameof(OccupancyDto.TotalSeats), "Tổng số ghế", "N0", width: 80);
+        SetColumn(nameof(OccupancyDto.SoldSeats), "Ghế đã bán", "N0", width: 80);
+        SetColumn(nameof(OccupancyDto.OccupancyRate), "Lấp đầy (%)", "N1", width: 105);
+        SetColumn(nameof(OccupancyDto.TotalPrice), "Doanh thu", "N0", width: 105);
 
         if (!_grid.Columns.Contains("StatusLabel"))
         {
@@ -225,7 +209,9 @@ public partial class frmOccupancyReport : Form
             {
                 Name = "StatusLabel",
                 HeaderText = "Trạng thái",
-                ReadOnly = true
+                ReadOnly = true,
+                Width = 95,
+                MinimumWidth = 80
             });
         }
 
@@ -241,7 +227,9 @@ public partial class frmOccupancyReport : Form
     private void SetColumn(
         string name,
         string header,
-        string? format = null)
+        string? format = null,
+        bool visible = true,
+        int? width = null)
     {
         if (!_grid.Columns.Contains(name))
             return;
@@ -249,6 +237,9 @@ public partial class frmOccupancyReport : Form
         var column = _grid.Columns[name]!;
 
         column.HeaderText = header;
+        column.Visible = visible;
+        if (width.HasValue)
+            column.Width = width.Value;
 
         if (format is not null)
             column.DefaultCellStyle.Format = format;
@@ -271,12 +262,21 @@ public partial class frmOccupancyReport : Form
         object? sender,
         DataGridViewCellFormattingEventArgs e)
     {
-        if (e.RowIndex < 0 ||
-            e.ColumnIndex < 0 ||
-            _grid.Columns[e.ColumnIndex].Name != "StatusLabel")
+        if (e.RowIndex < 0 || e.ColumnIndex < 0)
         {
             return;
         }
+
+        if (_grid.Columns[e.ColumnIndex].Name == nameof(OccupancyDto.RoomName) &&
+            string.IsNullOrWhiteSpace(Convert.ToString(e.Value)))
+        {
+            e.Value = "Chưa gán phòng";
+            e.FormattingApplied = true;
+            return;
+        }
+
+        if (_grid.Columns[e.ColumnIndex].Name != "StatusLabel")
+            return;
 
         var status = Convert.ToString(e.Value);
 
@@ -331,11 +331,12 @@ public partial class frmOccupancyReport : Form
 
         using var dialog = new SaveFileDialog
         {
+            Title = "Xuất báo cáo tỷ lệ lấp đầy",
             Filter = "CSV (*.csv)|*.csv",
             FileName = $"BaoCaoLapDay_{DateTime.Now:yyyyMMdd}.csv"
         };
 
-        if (dialog.ShowDialog() != DialogResult.OK)
+        if (dialog.ShowDialog(this) != DialogResult.OK)
             return;
 
         try

@@ -1,6 +1,9 @@
 
 using CinemaManagement.BLL.Services;
+using CinemaManagement.BLL.Session;
 using CinemaManagement.Core.Entities;
+using CinemaManagement.Core.Enums;
+using CinemaManagement.Core.Exceptions;
 using CinemaManagement.Core.Interfaces;
 
 namespace CinemaManagement.Tests.Services;
@@ -12,7 +15,7 @@ public class PromotionServiceTests
     public void Validate_ReturnsPromotion_WhenCodeIsValidAndOrderMeetsMinimum()
     {
         var repo = new FakePromotionRepository(ValidPromotion());
-        var service = new PromotionService(repo);
+        var service = CreateService(repo);
 
         Assert.That(
             service.Validate("SAVE10", 100000).Code,
@@ -25,10 +28,9 @@ public class PromotionServiceTests
         var promo = ValidPromotion();
         promo.EndDate = DateTime.Today.AddDays(-1);
 
-        var service = new PromotionService(
-            new FakePromotionRepository(promo));
+        var service = CreateService(new FakePromotionRepository(promo));
 
-        Assert.Throws<Exception>(
+        Assert.Throws<BusinessException>(
             () => service.Validate("SAVE10", 100000));
     }
 
@@ -39,10 +41,9 @@ public class PromotionServiceTests
         promo.UsageLimit = 5;
         promo.UsedCount = 5;
 
-        var service = new PromotionService(
-            new FakePromotionRepository(promo));
+        var service = CreateService(new FakePromotionRepository(promo));
 
-        Assert.Throws<Exception>(
+        Assert.Throws<BusinessException>(
             () => service.Validate("SAVE10", 100000));
     }
 
@@ -52,10 +53,9 @@ public class PromotionServiceTests
         var promo = ValidPromotion();
         promo.MinOrder = 200000;
 
-        var service = new PromotionService(
-            new FakePromotionRepository(promo));
+        var service = CreateService(new FakePromotionRepository(promo));
 
-        Assert.Throws<Exception>(
+        Assert.Throws<BusinessException>(
             () => service.Validate("SAVE10", 100000));
     }
 
@@ -66,12 +66,46 @@ public class PromotionServiceTests
         promo.Type = "Fixed";
         promo.Value = 200000;
 
-        var service = new PromotionService(
-            new FakePromotionRepository(promo));
+        var service = CreateService(new FakePromotionRepository(promo));
 
         Assert.That(
             service.ApplyDiscount("SAVE10", 100000),
             Is.EqualTo(100000m));
+    }
+
+    [Test]
+    public void ApplyDiscount_RoundsToWholeVndAmountDisplayedAtCheckout()
+    {
+        var promo = ValidPromotion();
+        promo.Value = 10;
+        var service = CreateService(new FakePromotionRepository(promo));
+
+        Assert.That(service.ApplyDiscount("SAVE10", 99999m), Is.EqualTo(10000m));
+    }
+
+    [Test]
+    public void AddPromotion_RejectsStaffBeforeRepositoryWrite()
+    {
+        var repository = new FakePromotionRepository(ValidPromotion());
+        var session = new CurrentUserSession();
+        session.Set(new User { Id = 3, Username = "staff", Role = UserRole.Staff });
+        var service = new PromotionService(repository, session);
+
+        Assert.Throws<BusinessException>(() => service.AddPromotion(ValidPromotion()));
+        Assert.That(repository.WriteCount, Is.Zero);
+    }
+
+    [Test]
+    public void AddPromotion_RejectsZeroLengthDateRangeBeforeRepositoryWrite()
+    {
+        var repository = new FakePromotionRepository(ValidPromotion());
+        var promotion = ValidPromotion();
+        promotion.StartDate = DateTime.Today;
+        promotion.EndDate = DateTime.Today;
+        var service = CreateService(repository);
+
+        Assert.Throws<BusinessException>(() => service.AddPromotion(promotion));
+        Assert.That(repository.WriteCount, Is.Zero);
     }
 
     private static Promotion ValidPromotion()
@@ -90,10 +124,19 @@ public class PromotionServiceTests
         };
     }
 
+    private static PromotionService CreateService(
+        IPromotionRepository repository)
+    {
+        var session = new CurrentUserSession();
+        session.Set(new User { Id = 1, Username = "admin", Role = UserRole.Admin });
+        return new PromotionService(repository, session);
+    }
+
     private sealed class FakePromotionRepository
         : IPromotionRepository
     {
         private readonly List<Promotion> _items;
+        public int WriteCount { get; private set; }
 
         public FakePromotionRepository(Promotion item)
         {
@@ -112,6 +155,7 @@ public class PromotionServiceTests
 
         public int Insert(Promotion entity)
         {
+            WriteCount++;
             entity.Id = _items.Count + 1;
             _items.Add(entity);
 
@@ -120,11 +164,13 @@ public class PromotionServiceTests
 
         public bool Update(Promotion entity)
         {
+            WriteCount++;
             return true;
         }
 
         public bool Delete(int id)
         {
+            WriteCount++;
             return _items.RemoveAll(x => x.Id == id) > 0;
         }
 

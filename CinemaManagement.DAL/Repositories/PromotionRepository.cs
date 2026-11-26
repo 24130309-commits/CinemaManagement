@@ -17,41 +17,78 @@ public sealed class PromotionRepository
     public override int Insert(Promotion entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
+        ValidatePromotion(entity);
 
-        const string sql = """
-            INSERT INTO Promotions
-                (Code, Description, Type, Value, MaxDiscountAmount,
-                 StartDate, EndDate, MinOrder, UsageLimit, UsedCount, IsActive)
-            VALUES
-                (@Code, @Description, @Type, @Value, @MaxDiscountAmount,
-                 @StartDate, @EndDate, @MinOrder, @UsageLimit, @UsedCount, @IsActive);
-
-            SELECT last_insert_rowid();
-            """;
+        if (IsCodeExists(entity.Code))
+            throw new InvalidOperationException("Mã khuyến mãi đã tồn tại.");
 
         using var connection = ConnectionFactory.CreateConnection();
 
-        return connection.ExecuteScalar<int>(sql, new
-        {
-            entity.Code,
-            entity.Description,
-            entity.Type,
-            entity.Value,
-            entity.MaxDiscountAmount,
-            StartDate = entity.StartDate.ToString("O"),
-            EndDate = entity.EndDate.ToString("O"),
-            entity.MinOrder,
-            entity.UsageLimit,
-            entity.UsedCount,
-            entity.IsActive
-        });
+        return connection.ExecuteScalar<int>(
+            """
+            INSERT INTO Promotions
+            (
+                Code,
+                Description,
+                Type,
+                Value,
+                MaxDiscountAmount,
+                StartDate,
+                EndDate,
+                MinOrder,
+                UsageLimit,
+                UsedCount,
+                IsActive
+            )
+            VALUES
+            (
+                @Code,
+                @Description,
+                @Type,
+                @Value,
+                @MaxDiscountAmount,
+                @StartDate,
+                @EndDate,
+                @MinOrder,
+                @UsageLimit,
+                @UsedCount,
+                @IsActive
+            );
+
+            SELECT last_insert_rowid();
+            """,
+            new
+            {
+                Code = entity.Code.Trim(),
+                Description = entity.Description,
+                entity.Type,
+                entity.Value,
+                entity.MaxDiscountAmount,
+                StartDate = entity.StartDate.ToString("O"),
+                EndDate = entity.EndDate.ToString("O"),
+                entity.MinOrder,
+                entity.UsageLimit,
+                entity.UsedCount,
+                IsActive = entity.IsActive ? 1 : 0
+            });
     }
 
     public override bool Update(Promotion entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
 
-        const string sql = """
+        if (entity.Id <= 0)
+            return false;
+
+        ValidatePromotion(entity);
+
+        if (IsCodeExists(entity.Code, entity.Id))
+            throw new InvalidOperationException("Mã khuyến mãi đã tồn tại.");
+
+        using var connection = ConnectionFactory.CreateConnection();
+
+        return connection.Execute(
+            """
             UPDATE Promotions
             SET Code = @Code,
                 Description = @Description,
@@ -62,37 +99,66 @@ public sealed class PromotionRepository
                 EndDate = @EndDate,
                 MinOrder = @MinOrder,
                 UsageLimit = @UsageLimit,
-                UsedCount = @UsedCount,
                 IsActive = @IsActive
             WHERE Id = @Id;
-            """;
-
-        using var connection = ConnectionFactory.CreateConnection();
-
-        return connection.Execute(sql, new
-        {
-            entity.Id,
-            entity.Code,
-            entity.Description,
-            entity.Type,
-            entity.Value,
-            entity.MaxDiscountAmount,
-            StartDate = entity.StartDate.ToString("O"),
-            EndDate = entity.EndDate.ToString("O"),
-            entity.MinOrder,
-            entity.UsageLimit,
-            entity.UsedCount,
-            entity.IsActive
-        }) > 0;
+            """,
+            new
+            {
+                entity.Id,
+                Code = entity.Code.Trim(),
+                Description = entity.Description,
+                entity.Type,
+                entity.Value,
+                entity.MaxDiscountAmount,
+                StartDate = entity.StartDate.ToString("O"),
+                EndDate = entity.EndDate.ToString("O"),
+                entity.MinOrder,
+                entity.UsageLimit,
+                IsActive = entity.IsActive ? 1 : 0
+            }) > 0;
     }
 
     public override bool Delete(int id)
     {
-        using var connection = ConnectionFactory.CreateConnection();
+        if (id <= 0)
+            return false;
 
-        return connection.Execute(
-            "DELETE FROM Promotions WHERE Id = @Id;",
-            new { Id = id }) > 0;
+        using var connection = ConnectionFactory.CreateConnection();
+        using var transaction = connection.BeginTransaction();
+
+        var usedCount = connection.ExecuteScalar<int?>(
+            """
+            SELECT UsedCount
+            FROM Promotions
+            WHERE Id = @Id;
+            """,
+            new { Id = id },
+            transaction);
+
+        if (!usedCount.HasValue)
+        {
+            transaction.Rollback();
+            return false;
+        }
+
+        if (usedCount.Value > 0)
+        {
+            transaction.Rollback();
+            return false;
+        }
+
+        var affected = connection.Execute(
+            """
+            DELETE FROM Promotions
+            WHERE Id = @Id
+              AND UsedCount = 0;
+            """,
+            new { Id = id },
+            transaction);
+
+        transaction.Commit();
+
+        return affected > 0;
     }
 
     public Promotion? GetByCode(string code)
@@ -118,17 +184,57 @@ public sealed class PromotionRepository
 
         using var connection = ConnectionFactory.CreateConnection();
 
-        return connection.ExecuteScalar<int>(
+        return connection.ExecuteScalar<bool>(
             """
-            SELECT COUNT(1)
-            FROM Promotions
-            WHERE Code = @Code COLLATE NOCASE
-              AND (@ExcludeId IS NULL OR Id <> @ExcludeId);
+            SELECT EXISTS
+            (
+                SELECT 1
+                FROM Promotions
+                WHERE Code = @Code COLLATE NOCASE
+                  AND (@ExcludeId IS NULL OR Id <> @ExcludeId)
+            );
             """,
             new
             {
                 Code = code.Trim(),
                 ExcludeId = excludeId
-            }) > 0;
+            });
+    }
+
+    private static void ValidatePromotion(Promotion entity)
+    {
+        if (string.IsNullOrWhiteSpace(entity.Code))
+            throw new ArgumentException("Mã khuyến mãi không được để trống.");
+
+        if (entity.StartDate >= entity.EndDate)
+            throw new ArgumentException("Ngày kết thúc phải sau ngày bắt đầu.");
+
+        if (entity.Value <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(entity.Value),
+                "Giá trị khuyến mãi phải lớn hơn 0.");
+
+        if (entity.MaxDiscountAmount < 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(entity.MaxDiscountAmount));
+
+        if (entity.MinOrder < 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(entity.MinOrder));
+
+        if (entity.UsageLimit < 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(entity.UsageLimit));
+
+        if (entity.UsedCount < 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(entity.UsedCount));
+
+        if (entity.UsageLimit > 0 &&
+            entity.UsedCount > entity.UsageLimit)
+        {
+            throw new ArgumentException(
+                "Số lượt đã sử dụng không được vượt giới hạn.");
+        }
     }
 }

@@ -1,4 +1,6 @@
-﻿using CinemaManagement.BLL.Services;
+﻿
+using CinemaManagement.BLL.Services;
+using CinemaManagement.BLL.Session;
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Enums;
 using CinemaManagement.Core.Interfaces;
@@ -29,7 +31,8 @@ public class PricingServiceTests
         var service = new PricingService(
             rules,
             new FakePromotionService(),
-            room);
+            room,
+            CreateAdminSession());
 
         var start = NextWeekdayAt(19, 0);
 
@@ -69,7 +72,9 @@ public class PricingServiceTests
 
         var service = new PricingService(
             new FakePricingRuleRepository(),
-            new FakePromotionService(promotion));
+            new FakePromotionService(promotion),
+            null,
+            CreateAdminSession());
 
         var result = service.CalculateFinalTicketPrice(
             100000,
@@ -85,7 +90,9 @@ public class PricingServiceTests
     {
         var service = new PricingService(
             new FakePricingRuleRepository(),
-            new FakePromotionService());
+            new FakePromotionService(),
+            null,
+            CreateAdminSession());
 
         Assert.That(
             service.CalculateFinalTicketPrice(
@@ -93,6 +100,23 @@ public class PricingServiceTests
                 DateTime.Today.AddHours(10),
                 "Normal"),
             Is.EqualTo(80000m));
+    }
+
+    [Test]
+    public void AddRule_RejectsStaffBeforeRepositoryWrite()
+    {
+        var rules = new FakePricingRuleRepository();
+        var session = new CurrentUserSession();
+        session.Set(new User { Id = 3, Username = "staff", Role = UserRole.Staff });
+        var service = new PricingService(
+            rules,
+            new FakePromotionService(),
+            null,
+            session);
+
+        Assert.Throws<CinemaManagement.Core.Exceptions.BusinessException>(
+            () => service.AddRule(new PricingRule()));
+        Assert.That(rules.WriteCount, Is.Zero);
     }
 
     private static DateTime NextWeekdayAt(
@@ -110,10 +134,18 @@ public class PricingServiceTests
         return date.AddHours(hour).AddMinutes(minute);
     }
 
+    private static CurrentUserSession CreateAdminSession()
+    {
+        var session = new CurrentUserSession();
+        session.Set(new User { Id = 1, Username = "admin", Role = UserRole.Admin });
+        return session;
+    }
+
     private sealed class FakePricingRuleRepository
         : IPricingRuleRepository
     {
         public List<PricingRule> Items { get; } = new();
+        public int WriteCount { get; private set; }
 
         public PricingRule? GetById(int id)
         {
@@ -127,6 +159,7 @@ public class PricingServiceTests
 
         public int Insert(PricingRule entity)
         {
+            WriteCount++;
             entity.Id = Items.Count + 1;
             Items.Add(entity);
 
@@ -135,11 +168,13 @@ public class PricingServiceTests
 
         public bool Update(PricingRule entity)
         {
+            WriteCount++;
             return true;
         }
 
         public bool Delete(int id)
         {
+            WriteCount++;
             return Items.RemoveAll(x => x.Id == id) > 0;
         }
 
@@ -185,8 +220,7 @@ public class PricingServiceTests
         public Promotion ValidateAndGetPromotion(string code)
         {
             return _promotion
-                ?? throw new InvalidOperationException(
-                    "No promotion");
+                ?? throw new InvalidOperationException("No promotion");
         }
 
         public Promotion Validate(
@@ -194,8 +228,7 @@ public class PricingServiceTests
             decimal orderTotal)
         {
             return _promotion
-                ?? throw new InvalidOperationException(
-                    "No promotion");
+                ?? throw new InvalidOperationException("No promotion");
         }
 
         public decimal ApplyDiscount(
@@ -265,6 +298,12 @@ public class PricingServiceTests
         public IEnumerable<Room> GetActive()
         {
             return GetAll();
+        }
+
+        // Bổ sung để triển khai đầy đủ IRoomRepository
+        public bool HasShowtimes(int roomId)
+        {
+            return false;
         }
     }
 }

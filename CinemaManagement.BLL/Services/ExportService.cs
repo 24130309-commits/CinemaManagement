@@ -214,7 +214,7 @@ public sealed class ExportService : IExportService
             string.Join(
                 ",",
                 properties.Select(property =>
-                    EscapeCsv(property.Name))));
+                    EscapeCsv(property.Name, protectFormula: true))));
 
         foreach (var row in rows)
         {
@@ -222,9 +222,12 @@ public sealed class ExportService : IExportService
                 string.Join(
                     ",",
                     properties.Select(property =>
-                        EscapeCsv(
-                            Convert.ToString(
-                                property.GetValue(row)) ?? string.Empty))));
+                    {
+                        var cell = property.GetValue(row);
+                        return EscapeCsv(
+                            Convert.ToString(cell) ?? string.Empty,
+                            protectFormula: cell is string);
+                    })));
         }
 
         File.WriteAllText(
@@ -233,8 +236,18 @@ public sealed class ExportService : IExportService
             new UTF8Encoding(true));
     }
 
-    private static string EscapeCsv(string value)
+    private static string EscapeCsv(string value, bool protectFormula = false)
     {
+        if (protectFormula)
+        {
+            var firstNonWhitespace = value.AsSpan().TrimStart();
+            if (!firstNonWhitespace.IsEmpty &&
+                firstNonWhitespace[0] is '=' or '+' or '-' or '@')
+            {
+                value = "'" + value;
+            }
+        }
+
         if (value.Contains('"'))
             value = value.Replace("\"", "\"\"");
 

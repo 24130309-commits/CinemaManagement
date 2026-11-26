@@ -8,6 +8,8 @@ public interface IRoomRepository : IRepository<Room>
 
     IEnumerable<Room> GetActive();
 
+    bool HasShowtimes(int roomId);
+
     int Add(Room room)
     {
         return Insert(room);

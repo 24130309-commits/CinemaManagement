@@ -13,4 +13,6 @@ public interface IShowtimeRepository : IRepository<Showtime>
         DateTime startTime,
         DateTime endTime,
         int? excludeShowtimeId = null);
+
+    bool HasTickets(int showtimeId);
 }

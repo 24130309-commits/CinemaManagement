@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS Movies
     Description TEXT NOT NULL DEFAULT '',
     PosterPath TEXT NOT NULL DEFAULT '',
     TrailerUrl TEXT NOT NULL DEFAULT '',
+    VideoPath TEXT NOT NULL DEFAULT '',
     AgeLimit INTEGER NOT NULL DEFAULT 0 CHECK (AgeLimit >= 0),
     ReleaseDate TEXT NOT NULL,
     Status INTEGER NOT NULL DEFAULT 0
@@ -160,6 +161,26 @@ CREATE TABLE IF NOT EXISTS Bookings
     FOREIGN KEY (CustomerId) REFERENCES Customers(Id) ON DELETE SET NULL,
     FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE RESTRICT
     );
+
+CREATE TABLE IF NOT EXISTS Payments
+(
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    BookingId INTEGER NOT NULL,
+    TransactionCode TEXT NOT NULL UNIQUE,
+    PaymentMethod INTEGER NOT NULL,
+    Amount NUMERIC NOT NULL CHECK (Amount >= 0),
+    Status INTEGER NOT NULL DEFAULT 0,
+    PaidAt TEXT NOT NULL,
+    ProviderReference TEXT NOT NULL DEFAULT '',
+    Note TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE RESTRICT
+    );
+
+CREATE INDEX IF NOT EXISTS IX_Payments_BookingId
+    ON Payments(BookingId);
+
+CREATE INDEX IF NOT EXISTS IX_Payments_Status_PaidAt
+    ON Payments(Status, PaidAt);
 
 CREATE TABLE IF NOT EXISTS Tickets
 (

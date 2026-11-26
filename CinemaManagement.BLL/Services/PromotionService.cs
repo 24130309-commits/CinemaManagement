@@ -2,17 +2,23 @@
 using CinemaManagement.Core.Entities;
 using CinemaManagement.Core.Exceptions;
 using CinemaManagement.Core.Interfaces;
+using CinemaManagement.BLL.Session;
 
 namespace CinemaManagement.BLL.Services;
 
 public class PromotionService : IPromotionService
 {
     private readonly IPromotionRepository _promotionRepository;
+    private readonly CurrentUserSession _session;
 
-    public PromotionService(IPromotionRepository promotionRepository)
+    public PromotionService(
+        IPromotionRepository promotionRepository,
+        CurrentUserSession session)
     {
         _promotionRepository = promotionRepository
             ?? throw new ArgumentNullException(nameof(promotionRepository));
+        _session = session
+            ?? throw new ArgumentNullException(nameof(session));
     }
 
     public IEnumerable<Promotion> GetAllPromotions()
@@ -29,7 +35,7 @@ public class PromotionService : IPromotionService
         }
 
         var promotion = _promotionRepository.GetByCode(
-            code.Trim().ToUpperInvariant());
+            code.Trim());
 
         if (promotion is null)
         {
@@ -37,18 +43,24 @@ public class PromotionService : IPromotionService
                 "Mã khuyến mãi không tồn tại.");
         }
 
+        var now = DateTime.Now;
+
         if (!promotion.IsActive)
         {
             throw new BusinessException(
-                "Mã khuyến mãi đã bị khóa, hết hạn hoặc hết lượt sử dụng.");
+                "Chương trình khuyến mãi đã bị quản trị viên khóa.");
         }
 
-        var now = DateTime.Now;
-
-        if (now < promotion.StartDate || now > promotion.EndDate)
+        if (now < promotion.StartDate)
         {
             throw new BusinessException(
-                "Mã khuyến mãi chưa đến hạn hoặc đã hết hạn.");
+                "Mã khuyến mãi chưa đến thời gian áp dụng.");
+        }
+
+        if (now > promotion.EndDate)
+        {
+            throw new BusinessException(
+                "Mã khuyến mãi đã hết hạn.");
         }
 
         if (promotion.UsageLimit > 0 &&
@@ -97,6 +109,12 @@ public class PromotionService : IPromotionService
             "Percent",
             StringComparison.OrdinalIgnoreCase))
         {
+            if (promotion.Value > 100)
+            {
+                throw new BusinessException(
+                    "Phần trăm giảm giá không được vượt quá 100%.");
+            }
+
             discount = orderTotal * promotion.Value / 100m;
         }
         else if (string.Equals(
@@ -119,20 +137,31 @@ public class PromotionService : IPromotionService
                 promotion.MaxDiscountAmount);
         }
 
-        return Math.Min(orderTotal, discount);
+        discount = decimal.Round(
+            discount,
+            0,
+            MidpointRounding.AwayFromZero);
+
+        return Math.Min(
+            orderTotal,
+            Math.Max(0m, discount));
     }
 
     public void AddPromotion(Promotion promotion)
     {
+        AuthorizationGuard.EnsureAdministrator(_session, "quản lý khuyến mãi");
         ValidatePromotionData(promotion);
 
-        promotion.Code = promotion.Code.Trim().ToUpperInvariant();
+        promotion.Code = NormalizeCode(promotion.Code);
 
         if (_promotionRepository.IsCodeExists(promotion.Code))
         {
             throw new BusinessException(
                 "Mã khuyến mãi này đã tồn tại.");
         }
+
+        // Chương trình mới bắt đầu với 0 lượt sử dụng.
+        promotion.UsedCount = 0;
 
         if (_promotionRepository.Insert(promotion) <= 0)
         {
@@ -143,6 +172,7 @@ public class PromotionService : IPromotionService
 
     public void UpdatePromotion(Promotion promotion)
     {
+        AuthorizationGuard.EnsureAdministrator(_session, "quản lý khuyến mãi");
         ValidatePromotionData(promotion);
 
         if (promotion.Id <= 0)
@@ -151,7 +181,15 @@ public class PromotionService : IPromotionService
                 "Mã khuyến mãi không hợp lệ.");
         }
 
-        promotion.Code = promotion.Code.Trim().ToUpperInvariant();
+        promotion.Code = NormalizeCode(promotion.Code);
+
+        var existing = _promotionRepository.GetById(promotion.Id);
+
+        if (existing is null)
+        {
+            throw new BusinessException(
+                "Không tìm thấy chương trình khuyến mãi.");
+        }
 
         if (_promotionRepository.IsCodeExists(
             promotion.Code,
@@ -159,6 +197,16 @@ public class PromotionService : IPromotionService
         {
             throw new BusinessException(
                 "Mã khuyến mãi bị trùng với chương trình khác.");
+        }
+
+        // Không cho chỉnh sửa làm mất lịch sử lượt sử dụng.
+        promotion.UsedCount = existing.UsedCount;
+
+        if (promotion.UsageLimit > 0 &&
+            promotion.UsageLimit < promotion.UsedCount)
+        {
+            throw new BusinessException(
+                "Giới hạn lượt sử dụng không được nhỏ hơn số lượt đã dùng.");
         }
 
         if (!_promotionRepository.Update(promotion))
@@ -170,10 +218,25 @@ public class PromotionService : IPromotionService
 
     public void DeletePromotion(int id)
     {
+        AuthorizationGuard.EnsureAdministrator(_session, "quản lý khuyến mãi");
         if (id <= 0)
         {
             throw new BusinessException(
                 "Mã khuyến mãi không hợp lệ.");
+        }
+
+        var promotion = _promotionRepository.GetById(id);
+
+        if (promotion is null)
+        {
+            throw new BusinessException(
+                "Không tìm thấy chương trình khuyến mãi.");
+        }
+
+        if (promotion.UsedCount > 0)
+        {
+            throw new BusinessException(
+                "Không thể xóa chương trình đã phát sinh giao dịch. Hãy khóa chương trình thay vì xóa.");
         }
 
         if (!_promotionRepository.Delete(id))
@@ -181,6 +244,11 @@ public class PromotionService : IPromotionService
             throw new BusinessException(
                 "Không thể xóa chương trình khuyến mãi.");
         }
+    }
+
+    private static string NormalizeCode(string code)
+    {
+        return code.Trim().ToUpperInvariant();
     }
 
     private static void ValidatePromotionData(Promotion promotion)
@@ -195,6 +263,12 @@ public class PromotionService : IPromotionService
         {
             throw new BusinessException(
                 "Mã khuyến mãi không được để trống.");
+        }
+
+        if (promotion.Code.Trim().Length > 50)
+        {
+            throw new BusinessException(
+                "Mã khuyến mãi không được vượt quá 50 ký tự.");
         }
 
         if (string.IsNullOrWhiteSpace(promotion.Type))
@@ -229,16 +303,11 @@ public class PromotionService : IPromotionService
                 "Loại khuyến mãi không hợp lệ.");
         }
 
-        if (promotion.MaxDiscountAmount < 0)
+        if (promotion.MaxDiscountAmount < 0 ||
+            promotion.MinOrder < 0)
         {
             throw new BusinessException(
-                "Mức giảm tối đa không được âm.");
-        }
-
-        if (promotion.MinOrder < 0)
-        {
-            throw new BusinessException(
-                "Giá trị đơn hàng tối thiểu không hợp lệ.");
+                "Giá trị giảm tối đa hoặc đơn hàng tối thiểu không hợp lệ.");
         }
 
         if (promotion.UsageLimit < 0 ||
@@ -248,10 +317,17 @@ public class PromotionService : IPromotionService
                 "Giới hạn lượt sử dụng không hợp lệ.");
         }
 
+        if (promotion.UsageLimit > 0 &&
+            promotion.UsedCount > promotion.UsageLimit)
+        {
+            throw new BusinessException(
+                "Số lượt đã sử dụng vượt quá giới hạn chương trình.");
+        }
+
         if (promotion.EndDate <= promotion.StartDate)
         {
             throw new BusinessException(
-                "Ngày kết thúc phải sau ngày bắt đầu.");
+                "Thời gian kết thúc phải sau thời gian bắt đầu.");
         }
     }
 }

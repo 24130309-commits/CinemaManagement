@@ -6,11 +6,12 @@ using System.Linq;
 using System.Windows.Forms;
 using CinemaManagement.Core.DTOs;
 using CinemaManagement.Core.Interfaces;
+using CinemaManagement.UI.Controls;
 using CinemaManagement.UI.Helpers;
 
 namespace CinemaManagement.UI.Forms.Reports;
 
-public partial class frmRevenueReport : Form
+public partial class frmRevenueReport : UserControl
 {
     private readonly IReportService _reports;
     private readonly IExportService _export;
@@ -30,7 +31,7 @@ public partial class frmRevenueReport : Form
         Format = DateTimePickerFormat.Short
     };
 
-    private readonly DataGridView _grid = new()
+    private readonly EmptyStateDataGridView _grid = new()
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
@@ -66,43 +67,28 @@ public partial class frmRevenueReport : Form
         InitializeComponent();
 
         Text = "Báo cáo doanh thu";
-        StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new Size(950, 580);
-        Size = new Size(1100, 680);
         BackColor = ThemeHelper.Background;
 
         BuildLayout();
 
-        Load += (_, _) => LoadData();
+        LoadData();
 
         ThemeHelper.Apply(this);
     }
 
     private void BuildLayout()
     {
-        var heading = new Panel
-        {
-            Dock = DockStyle.Top,
-            Height = 76,
-            Padding = new Padding(18, 12, 12, 8),
-            BackColor = ThemeHelper.Surface
-        };
-
-        heading.Controls.Add(new Label
-        {
-            Text = "BÁO CÁO DOANH THU",
-            Dock = DockStyle.Top,
-            Height = 36,
-            Font = ThemeHelper.HeadingFont,
-            ForeColor = ThemeHelper.Primary
-        });
+        var heading = new PageHeader(
+            "Doanh thu",
+            "Lọc doanh thu theo thời gian, xem chi tiết theo phim và xuất dữ liệu.");
 
         var toolbar = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
             Height = 66,
             Padding = new Padding(14, 12, 8, 8),
-            WrapContents = false,
+            WrapContents = true,
+            AutoScroll = true,
             BackColor = ThemeHelper.Surface
         };
 
@@ -144,6 +130,8 @@ public partial class frmRevenueReport : Form
 
         toolbar.Controls.Add(load);
         toolbar.Controls.Add(export);
+
+        _grid.EmptyStateText = "Không có doanh thu trong khoảng thời gian đã chọn.";
 
         var content = new Panel
         {
@@ -222,8 +210,7 @@ public partial class frmRevenueReport : Form
         SetColumn(
             nameof(RevenueByMovieDto.TicketCount),
             "Số vé",
-            true,
-            "N0");
+            false);
 
         SetColumn(
             nameof(RevenueByMovieDto.TicketRevenue),
@@ -293,11 +280,12 @@ public partial class frmRevenueReport : Form
 
         using var dialog = new SaveFileDialog
         {
+            Title = "Xuất báo cáo doanh thu",
             Filter = "CSV (*.csv)|*.csv",
             FileName = $"BaoCaoDoanhThu_{DateTime.Now:yyyyMMdd}.csv"
         };
 
-        if (dialog.ShowDialog() != DialogResult.OK)
+        if (dialog.ShowDialog(this) != DialogResult.OK)
             return;
 
         try

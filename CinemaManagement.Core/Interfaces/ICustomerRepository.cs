@@ -13,6 +13,9 @@ public interface ICustomerRepository : IRepository<Customer>
 
     bool UpdateTier(int customerId, string tier);
 
+    // Cộng điểm và cập nhật hạng trong cùng một thao tác.
+    bool AddPointsAndUpdateTier(int customerId, int points);
+
     IEnumerable<CustomerPurchaseHistoryDto>
         GetPurchaseHistory(int customerId);
 }

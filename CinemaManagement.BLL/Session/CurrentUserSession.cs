@@ -5,6 +5,8 @@ namespace CinemaManagement.BLL.Session;
 
 public sealed class CurrentUserSession
 {
+    public string SessionId { get; } = Guid.NewGuid().ToString("N");
+
     public User? User { get; private set; }
 
     public User? CurrentUser => User;

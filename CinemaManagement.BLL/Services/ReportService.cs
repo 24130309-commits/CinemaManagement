@@ -1,6 +1,7 @@
 ﻿using Dapper;
 using CinemaManagement.Core.DTOs;
 using CinemaManagement.Core.Interfaces;
+using CinemaManagement.BLL.Session;
 using CinemaManagement.DAL.Database;
 
 namespace CinemaManagement.BLL.Services;
@@ -9,19 +10,23 @@ public sealed class ReportService : IReportService
 {
     private readonly IReportRepository _reports;
     private readonly SqliteConnectionFactory _factory;
+    private readonly CurrentUserSession _session;
 
     public ReportService(
         IReportRepository reports,
-        SqliteConnectionFactory factory)
+        SqliteConnectionFactory factory,
+        CurrentUserSession session)
     {
-        _reports = reports;
-        _factory = factory;
+        _reports = reports ?? throw new ArgumentNullException(nameof(reports));
+        _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
     }
 
     public IEnumerable<RevenueByMovieDto> GetRevenueByMovie(
         DateTime from,
         DateTime to)
     {
+        AuthorizationGuard.EnsureAuthenticated(_session);
         return ValidateRange(from, to, _reports.RevenueByMovie);
     }
 
@@ -29,18 +34,21 @@ public sealed class ReportService : IReportService
         DateTime from,
         DateTime to)
     {
+        AuthorizationGuard.EnsureAuthenticated(_session);
         return ValidateRange(from, to, _reports.OccupancyByShowtime);
     }
 
-    public IEnumerable<dynamic> GetRevenueByDay(
+    public IEnumerable<RevenueByDayDto> GetRevenueByDay(
         DateTime from,
         DateTime to)
     {
+        AuthorizationGuard.EnsureAuthenticated(_session);
         return ValidateRange(from, to, _reports.RevenueByDay);
     }
 
-    public dynamic GetDashboardStats()
+    public DashboardStatsDto GetDashboardStats()
     {
+        AuthorizationGuard.EnsureAuthenticated(_session);
         var today = DateTime.Today;
 
         using var c = _factory.CreateConnection();
@@ -99,7 +107,7 @@ public sealed class ReportService : IReportService
             .RevenueByDay(today.AddDays(-6), today)
             .ToList();
 
-        var upcoming = c.Query(
+        var upcoming = c.Query<UpcomingShowtimeDto>(
             @"SELECT s.Id AS ShowtimeId,
                      m.Title AS MovieTitle,
                      r.Name AS RoomName,
@@ -107,7 +115,8 @@ public sealed class ReportService : IReportService
                      s.EndTime,
                      (SELECT COUNT(*)
                       FROM Seats se
-                      WHERE se.RoomId = s.RoomId)
+                      WHERE se.RoomId = s.RoomId
+                        AND se.SeatType <> 3)
                      -
                      (SELECT COUNT(DISTINCT t.SeatId)
                       FROM Tickets t
@@ -128,13 +137,13 @@ public sealed class ReportService : IReportService
             })
             .AsList();
 
-        return new
+        return new DashboardStatsDto
         {
             TicketsToday = tickets,
             RevenueToday = revenue,
             RevenueLast7Days = last7,
             RevenueLast30Days = last30,
-            TopMovies = _reports.TopMovies(5),
+            TopMovies = _reports.TopMovies(5).ToList(),
             RevenueTrend = trend,
             UpcomingShowtimes = upcoming
         };

@@ -3,7 +3,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
-using CinemaManagement.Core.Constants;
+using CinemaManagement.Core.Storage;
 
 namespace CinemaManagement.UI.Helpers;
 
@@ -21,12 +21,7 @@ public static class ImageHelper
         }
 
         var directory = Path.GetFullPath(
-            posterDirectory ??
-            Path.Combine(
-                AppContext.BaseDirectory,
-                AppConstants.PosterDirectoryName.Replace(
-                    '/',
-                    Path.DirectorySeparatorChar)));
+            posterDirectory ?? StoragePathResolver.PostersDirectory);
 
         Directory.CreateDirectory(directory);
 
@@ -42,19 +37,41 @@ public static class ImageHelper
             directory,
             Guid.NewGuid().ToString("N") + extension);
 
-        using var image = Image.FromFile(sourcePath);
-        image.Save(destination);
+        try
+        {
+            using var image = Image.FromFile(sourcePath);
+            image.Save(destination);
 
-        return destination;
+            // Lưu đường dẫn tương đối để có thể chuyển ứng dụng sang máy khác.
+            return StoragePathResolver.ToRelativePath(destination);
+        }
+        catch
+        {
+            try
+            {
+                if (File.Exists(destination))
+                    File.Delete(destination);
+            }
+            catch
+            {
+            }
+
+            throw;
+        }
     }
 
     public static Image? LoadUnlocked(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        var fullPath = StoragePathResolver.ResolvePath(path);
+
+        if (!File.Exists(fullPath))
             return null;
 
         using var stream = new FileStream(
-            path,
+            fullPath,
             FileMode.Open,
             FileAccess.Read,
             FileShare.ReadWrite);
@@ -75,9 +92,11 @@ public static class ImageHelper
         int height)
     {
         if (width <= 0 || height <= 0)
+        {
             throw new ArgumentOutOfRangeException(
                 nameof(width),
                 "Kích thước ảnh phải lớn hơn 0.");
+        }
 
         using var source = LoadUnlocked(path);
 

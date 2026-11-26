@@ -8,15 +8,22 @@ public sealed class FormFactory
 
     public FormFactory(IServiceProvider provider)
     {
-        _provider = provider;
+        _provider = provider
+                    ?? throw new ArgumentNullException(nameof(provider));
     }
 
-    public T Create<T>() where T : Form
+    public T Create<T>() where T : Control
     {
-        return _provider.GetRequiredService<T>();
+        var form = _provider.GetRequiredService<T>();
+
+        // Tự động áp dụng giao diện thống nhất.
+        ThemeHelper.Apply(form);
+
+        return form;
     }
 
-    public DialogResult ShowDialog<T>(IWin32Window? owner = null)
+    public DialogResult ShowDialog<T>(
+        IWin32Window? owner = null)
         where T : Form
     {
         using var form = Create<T>();

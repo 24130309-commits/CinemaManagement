@@ -18,36 +18,63 @@ public sealed class PricingRuleRepository
     public override int Insert(PricingRule entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
-
-        const string sql = """
-            INSERT INTO PricingRules
-                (Name, SeatType, ScreenType, DayType, TimeFrom, TimeTo, Multiplier, ExtraFee)
-            VALUES
-                (@Name, @SeatType, @ScreenType, @DayType, @TimeFrom, @TimeTo, @Multiplier, @ExtraFee);
-
-            SELECT last_insert_rowid();
-            """;
+        ValidateRule(entity);
 
         using var connection = ConnectionFactory.CreateConnection();
 
-        return connection.ExecuteScalar<int>(sql, new
-        {
-            entity.Name,
-            SeatType = (int)entity.SeatType,
-            ScreenType = (int)entity.ScreenType,
-            entity.DayType,
-            entity.TimeFrom,
-            entity.TimeTo,
-            entity.Multiplier,
-            entity.ExtraFee
-        });
+        return connection.ExecuteScalar<int>(
+            """
+            INSERT INTO PricingRules
+            (
+                Name,
+                SeatType,
+                ScreenType,
+                DayType,
+                TimeFrom,
+                TimeTo,
+                Multiplier,
+                ExtraFee
+            )
+            VALUES
+            (
+                @Name,
+                @SeatType,
+                @ScreenType,
+                @DayType,
+                @TimeFrom,
+                @TimeTo,
+                @Multiplier,
+                @ExtraFee
+            );
+
+            SELECT last_insert_rowid();
+            """,
+            new
+            {
+                Name = entity.Name.Trim(),
+                SeatType = (int)entity.SeatType,
+                ScreenType = (int)entity.ScreenType,
+                DayType = entity.DayType.Trim(),
+                entity.TimeFrom,
+                entity.TimeTo,
+                entity.Multiplier,
+                entity.ExtraFee
+            });
     }
 
     public override bool Update(PricingRule entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
 
-        const string sql = """
+        if (entity.Id <= 0)
+            return false;
+
+        ValidateRule(entity);
+
+        using var connection = ConnectionFactory.CreateConnection();
+
+        return connection.Execute(
+            """
             UPDATE PricingRules
             SET Name = @Name,
                 SeatType = @SeatType,
@@ -58,30 +85,33 @@ public sealed class PricingRuleRepository
                 Multiplier = @Multiplier,
                 ExtraFee = @ExtraFee
             WHERE Id = @Id;
-            """;
-
-        using var connection = ConnectionFactory.CreateConnection();
-
-        return connection.Execute(sql, new
-        {
-            entity.Id,
-            entity.Name,
-            SeatType = (int)entity.SeatType,
-            ScreenType = (int)entity.ScreenType,
-            entity.DayType,
-            entity.TimeFrom,
-            entity.TimeTo,
-            entity.Multiplier,
-            entity.ExtraFee
-        }) > 0;
+            """,
+            new
+            {
+                entity.Id,
+                Name = entity.Name.Trim(),
+                SeatType = (int)entity.SeatType,
+                ScreenType = (int)entity.ScreenType,
+                DayType = entity.DayType.Trim(),
+                entity.TimeFrom,
+                entity.TimeTo,
+                entity.Multiplier,
+                entity.ExtraFee
+            }) > 0;
     }
 
     public override bool Delete(int id)
     {
+        if (id <= 0)
+            return false;
+
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Execute(
-            "DELETE FROM PricingRules WHERE Id = @Id;",
+            """
+            DELETE FROM PricingRules
+            WHERE Id = @Id;
+            """,
             new { Id = id }) > 0;
     }
 
@@ -89,12 +119,14 @@ public sealed class PricingRuleRepository
         string dayType,
         string seatType)
     {
-        if (!Enum.TryParse<SeatType>(
+        if (string.IsNullOrWhiteSpace(dayType) ||
+            !Enum.TryParse<SeatType>(
                 seatType,
                 true,
-                out var parsedSeatType))
+                out var parsedSeatType) ||
+            !Enum.IsDefined(parsedSeatType))
         {
-            return Enumerable.Empty<PricingRule>();
+            return [];
         }
 
         using var connection = ConnectionFactory.CreateConnection();
@@ -111,7 +143,7 @@ public sealed class PricingRuleRepository
             """,
             new
             {
-                DayType = dayType,
+                DayType = dayType.Trim(),
                 SeatType = (int)parsedSeatType
             }).AsList();
     }
@@ -121,6 +153,13 @@ public sealed class PricingRuleRepository
         ScreenType screenType,
         string dayType)
     {
+        if (!Enum.IsDefined(seatType) ||
+            !Enum.IsDefined(screenType) ||
+            string.IsNullOrWhiteSpace(dayType))
+        {
+            return [];
+        }
+
         using var connection = ConnectionFactory.CreateConnection();
 
         return connection.Query<PricingRule>(
@@ -138,7 +177,38 @@ public sealed class PricingRuleRepository
             {
                 SeatType = (int)seatType,
                 ScreenType = (int)screenType,
-                DayType = dayType
+                DayType = dayType.Trim()
             }).AsList();
+    }
+
+    private static void ValidateRule(PricingRule entity)
+    {
+        if (string.IsNullOrWhiteSpace(entity.Name))
+            throw new ArgumentException("Tên quy tắc giá không được để trống.");
+
+        if (string.IsNullOrWhiteSpace(entity.DayType))
+            throw new ArgumentException("Loại ngày không được để trống.");
+
+        if (!Enum.IsDefined(entity.SeatType))
+            throw new ArgumentException("Loại ghế không hợp lệ.");
+
+        if (!Enum.IsDefined(entity.ScreenType))
+            throw new ArgumentException("Loại phòng chiếu không hợp lệ.");
+
+        if (entity.Multiplier <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(entity.Multiplier),
+                "Hệ số giá phải lớn hơn 0.");
+
+        if (entity.ExtraFee < 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(entity.ExtraFee),
+                "Phụ phí không được âm.");
+
+        if (!TimeSpan.TryParse(entity.TimeFrom, out _) ||
+            !TimeSpan.TryParse(entity.TimeTo, out _))
+        {
+            throw new ArgumentException("Khung giờ áp dụng không hợp lệ.");
+        }
     }
 }

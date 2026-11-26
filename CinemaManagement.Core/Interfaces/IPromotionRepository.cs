@@ -7,4 +7,5 @@ public interface IPromotionRepository : IRepository<Promotion>
     Promotion? GetByCode(string code);
 
     bool IsCodeExists(string code, int? excludeId = null);
+
 }

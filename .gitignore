@@ -1,6 +1,7 @@
 ﻿# Build results
 bin/
 obj/
+.verification-uxdesign*/
 
 # Rider
 .idea/

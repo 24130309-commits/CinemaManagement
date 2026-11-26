@@ -1,7 +1,9 @@
 
 using CinemaManagement.Core.Entities;
+using CinemaManagement.Core.Enums;
 using CinemaManagement.Core.Exceptions;
 using CinemaManagement.Core.Interfaces;
+using CinemaManagement.BLL.Session;
 
 namespace CinemaManagement.BLL.Services;
 
@@ -10,18 +12,13 @@ public class PricingService : IPricingService
     private readonly IPricingRuleRepository _pricingRuleRepository;
     private readonly IPromotionService _promotionService;
     private readonly IRoomRepository? _roomRepository;
-
-    public PricingService(
-        IPricingRuleRepository pricingRuleRepository,
-        IPromotionService promotionService)
-        : this(pricingRuleRepository, promotionService, null)
-    {
-    }
+    private readonly CurrentUserSession _session;
 
     public PricingService(
         IPricingRuleRepository pricingRuleRepository,
         IPromotionService promotionService,
-        IRoomRepository? roomRepository)
+        IRoomRepository? roomRepository,
+        CurrentUserSession session)
     {
         _pricingRuleRepository = pricingRuleRepository
             ?? throw new ArgumentNullException(nameof(pricingRuleRepository));
@@ -30,6 +27,8 @@ public class PricingService : IPricingService
             ?? throw new ArgumentNullException(nameof(promotionService));
 
         _roomRepository = roomRepository;
+        _session = session
+            ?? throw new ArgumentNullException(nameof(session));
     }
 
     public IEnumerable<PricingRule> GetAllRules()
@@ -39,6 +38,7 @@ public class PricingService : IPricingService
 
     public void AddRule(PricingRule rule)
     {
+        AuthorizationGuard.EnsureAdministrator(_session, "quản lý quy tắc giá");
         ValidateRule(rule);
 
         if (_pricingRuleRepository.Insert(rule) <= 0)
@@ -50,6 +50,7 @@ public class PricingService : IPricingService
 
     public void UpdateRule(PricingRule rule)
     {
+        AuthorizationGuard.EnsureAdministrator(_session, "quản lý quy tắc giá");
         ValidateRule(rule);
 
         if (rule.Id <= 0)
@@ -67,6 +68,7 @@ public class PricingService : IPricingService
 
     public void DeleteRule(int id)
     {
+        AuthorizationGuard.EnsureAdministrator(_session, "quản lý quy tắc giá");
         if (id <= 0)
         {
             throw new BusinessException(
@@ -80,7 +82,9 @@ public class PricingService : IPricingService
         }
     }
 
-    public decimal CalculateTicketPrice(Showtime showtime, Seat seat)
+    public decimal CalculateTicketPrice(
+        Showtime showtime,
+        Seat seat)
     {
         if (showtime is null || seat is null)
         {
@@ -88,13 +92,16 @@ public class PricingService : IPricingService
                 "Thông tin suất chiếu hoặc ghế không hợp lệ.");
         }
 
-        if (showtime.BasePrice < 0)
+        if (showtime.Id <= 0 ||
+            showtime.RoomId <= 0 ||
+            showtime.BasePrice < 0)
         {
             throw new BusinessException(
-                "Giá vé cơ bản không hợp lệ.");
+                "Thông tin suất chiếu hoặc giá vé không hợp lệ.");
         }
 
-        if (showtime.RoomId != seat.RoomId)
+        if (seat.Id <= 0 ||
+            seat.RoomId != showtime.RoomId)
         {
             throw new BusinessException(
                 "Ghế không thuộc phòng của suất chiếu.");
@@ -116,28 +123,23 @@ public class PricingService : IPricingService
 
         var dayType = GetDayType(showtime.StartTime);
 
-        var matchingRules = _pricingRuleRepository
-            .GetBySeatAndScreenType(
-                seat.SeatType,
-                room.ScreenType,
-                dayType)
-            .Where(rule => TimeMatches(
-                rule,
-                showtime.StartTime.TimeOfDay))
-            .ToList();
+        var rules = _pricingRuleRepository.GetBySeatAndScreenType(
+            seat.SeatType,
+            room.ScreenType,
+            dayType);
 
-        var multiplier = matchingRules.Count == 0
-            ? 1m
-            : matchingRules.Max(rule => rule.Multiplier);
+        var selectedRule = ResolveApplicableRule(
+            rules,
+            dayType,
+            showtime.StartTime.TimeOfDay);
 
-        var extraFee = matchingRules.Sum(rule => rule.ExtraFee);
+        var multiplier = selectedRule?.Multiplier ?? 1m;
+        var extraFee = selectedRule?.ExtraFee ?? 0m;
 
-        var totalPrice = showtime.BasePrice * multiplier + extraFee;
+        var totalPrice =
+            showtime.BasePrice * multiplier + extraFee;
 
-        return decimal.Round(
-            Math.Max(0, totalPrice),
-            0,
-            MidpointRounding.AwayFromZero);
+        return RoundPrice(totalPrice);
     }
 
     public decimal CalculateFinalTicketPrice(
@@ -158,74 +160,89 @@ public class PricingService : IPricingService
                 "Loại ghế không hợp lệ.");
         }
 
+        if (!Enum.TryParse<SeatType>(
+            seatType.Trim(),
+            true,
+            out var parsedSeatType))
+        {
+            throw new BusinessException(
+                "Loại ghế không tồn tại.");
+        }
+
         var dayType = GetDayType(showTime);
 
-        var matchingRules = _pricingRuleRepository
-            .GetByDayAndSeatType(dayType, seatType)
-            .Where(rule => TimeMatches(rule, showTime.TimeOfDay))
-            .ToList();
+        var rules = _pricingRuleRepository.GetByDayAndSeatType(
+            dayType,
+            parsedSeatType.ToString());
 
-        var multiplier = matchingRules.Count == 0
-            ? 1m
-            : matchingRules.Max(rule => rule.Multiplier);
+        var selectedRule = ResolveApplicableRule(
+            rules,
+            dayType,
+            showTime.TimeOfDay);
 
-        var extraFee = matchingRules.Sum(rule => rule.ExtraFee);
+        var multiplier = selectedRule?.Multiplier ?? 1m;
+        var extraFee = selectedRule?.ExtraFee ?? 0m;
 
-        var totalPrice = basePrice * multiplier + extraFee;
+        var totalPrice =
+            basePrice * multiplier + extraFee;
 
         if (!string.IsNullOrWhiteSpace(promoCode))
         {
-            var promotion =
-                _promotionService.ValidateAndGetPromotion(promoCode);
+            var discount = _promotionService.ApplyDiscount(
+                promoCode.Trim(),
+                totalPrice);
 
-            if (promotion.MinOrder > totalPrice)
-            {
-                throw new BusinessException(
-                    "Đơn hàng chưa đạt giá trị tối thiểu để sử dụng mã.");
-            }
-
-            var discount = string.Equals(
-                promotion.Type,
-                "Percent",
-                StringComparison.OrdinalIgnoreCase)
-                ? totalPrice * promotion.Value / 100m
-                : promotion.Value;
-
-            if (promotion.MaxDiscountAmount > 0)
-            {
-                discount = Math.Min(
-                    discount,
-                    promotion.MaxDiscountAmount);
-            }
-
-            totalPrice -= Math.Min(totalPrice, discount);
+            totalPrice -= discount;
         }
 
-        return decimal.Round(
-            Math.Max(0, totalPrice),
-            0,
-            MidpointRounding.AwayFromZero);
+        return RoundPrice(totalPrice);
     }
 
-    private static string GetDayType(DateTime date)
+    private static PricingRule? ResolveApplicableRule(
+        IEnumerable<PricingRule> rules,
+        string dayType,
+        TimeSpan currentTime)
     {
-        return date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday
-            ? "Weekend"
-            : "Weekday";
+        var matchedRules = rules
+            .Where(rule => TimeMatches(rule, currentTime))
+            .ToList();
+
+        if (matchedRules.Count == 0)
+            return null;
+
+        // Quy tắc theo ngày cụ thể được ưu tiên hơn All.
+        var daySpecificRules = matchedRules
+            .Where(rule => string.Equals(
+                rule.DayType,
+                dayType,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var candidates = daySpecificRules.Count > 0
+            ? daySpecificRules
+            : matchedRules
+                .Where(rule => string.Equals(
+                    rule.DayType,
+                    "All",
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+        return candidates
+            .OrderBy(rule => GetTimeWindowDuration(rule))
+            .ThenByDescending(rule => rule.Multiplier)
+            .ThenByDescending(rule => rule.ExtraFee)
+            .ThenBy(rule => rule.Id)
+            .FirstOrDefault();
     }
 
     private static bool TimeMatches(
         PricingRule rule,
         TimeSpan currentTime)
     {
-        if (!TimeSpan.TryParse(rule.TimeFrom, out var from))
+        if (!TimeSpan.TryParse(rule.TimeFrom, out var from) ||
+            !TimeSpan.TryParse(rule.TimeTo, out var to))
         {
-            return true;
-        }
-
-        if (!TimeSpan.TryParse(rule.TimeTo, out var to))
-        {
-            return true;
+            return false;
         }
 
         if (from <= to)
@@ -233,7 +250,39 @@ public class PricingService : IPricingService
             return currentTime >= from && currentTime <= to;
         }
 
+        // Hỗ trợ khung giờ qua nửa đêm.
         return currentTime >= from || currentTime <= to;
+    }
+
+    private static TimeSpan GetTimeWindowDuration(
+        PricingRule rule)
+    {
+        if (!TimeSpan.TryParse(rule.TimeFrom, out var from) ||
+            !TimeSpan.TryParse(rule.TimeTo, out var to))
+        {
+            return TimeSpan.MaxValue;
+        }
+
+        if (to >= from)
+            return to - from;
+
+        return TimeSpan.FromDays(1) - from + to;
+    }
+
+    private static string GetDayType(DateTime date)
+    {
+        return date.DayOfWeek is
+            DayOfWeek.Saturday or DayOfWeek.Sunday
+            ? "Weekend"
+            : "Weekday";
+    }
+
+    private static decimal RoundPrice(decimal price)
+    {
+        return decimal.Round(
+            Math.Max(0m, price),
+            0,
+            MidpointRounding.AwayFromZero);
     }
 
     private static void ValidateRule(PricingRule rule)
@@ -248,6 +297,13 @@ public class PricingService : IPricingService
         {
             throw new BusinessException(
                 "Tên quy tắc giá không được để trống.");
+        }
+
+        if (!Enum.IsDefined(typeof(SeatType), rule.SeatType) ||
+            !Enum.IsDefined(typeof(ScreenType), rule.ScreenType))
+        {
+            throw new BusinessException(
+                "Loại ghế hoặc loại phòng không hợp lệ.");
         }
 
         if (rule.Multiplier <= 0)
@@ -268,18 +324,23 @@ public class PricingService : IPricingService
                 "Vui lòng chọn loại ngày.");
         }
 
-        if (string.IsNullOrWhiteSpace(rule.TimeFrom) ||
-            string.IsNullOrWhiteSpace(rule.TimeTo))
+        if (!new[] { "All", "Weekday", "Weekend" }
+            .Contains(rule.DayType.Trim(),
+                StringComparer.OrdinalIgnoreCase))
+        {
+            throw new BusinessException(
+                "Loại ngày không hợp lệ.");
+        }
+
+        if (!TimeSpan.TryParse(rule.TimeFrom, out var from) ||
+            !TimeSpan.TryParse(rule.TimeTo, out var to) ||
+            from < TimeSpan.Zero ||
+            to < TimeSpan.Zero ||
+            from >= TimeSpan.FromDays(1) ||
+            to >= TimeSpan.FromDays(1))
         {
             throw new BusinessException(
                 "Khung giờ áp dụng không hợp lệ.");
-        }
-
-        if (!TimeSpan.TryParse(rule.TimeFrom, out _) ||
-            !TimeSpan.TryParse(rule.TimeTo, out _))
-        {
-            throw new BusinessException(
-                "Định dạng khung giờ không hợp lệ.");
         }
     }
 }

@@ -9,7 +9,6 @@ partial class frmChangePassword
         AutoScaleMode = AutoScaleMode.Font;
         ClientSize = new Size(520, 420);
         Text = "Đổi mật khẩu";
-        StartPosition = FormStartPosition.CenterParent;
 
         ResumeLayout(false);
     }

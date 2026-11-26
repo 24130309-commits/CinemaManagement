@@ -2,8 +2,6 @@
 
 public class Promotion
 {
-    private bool _isActive = true;
-
     public int Id { get; set; }
 
     public string Code { get; set; } = string.Empty;
@@ -16,9 +14,13 @@ public class Promotion
 
     public decimal DiscountPercent
     {
-        get => string.Equals(Type, "Percent", StringComparison.OrdinalIgnoreCase)
+        get => string.Equals(
+            Type,
+            "Percent",
+            StringComparison.OrdinalIgnoreCase)
             ? Value
             : 0m;
+
         set
         {
             Type = "Percent";
@@ -38,12 +40,13 @@ public class Promotion
 
     public int UsedCount { get; set; }
 
-    public bool IsActive
-    {
-        get => _isActive
-               && DateTime.Now >= StartDate
-               && DateTime.Now <= EndDate
-               && (UsageLimit <= 0 || UsedCount < UsageLimit);
-        set => _isActive = value;
-    }
+    // Trạng thái do quản trị viên thiết lập.
+    public bool IsActive { get; set; } = true;
+
+    // Trạng thái hiệu lực tại thời điểm hiện tại.
+    public bool IsCurrentlyValid =>
+        IsActive &&
+        DateTime.Now >= StartDate &&
+        DateTime.Now <= EndDate &&
+        (UsageLimit <= 0 || UsedCount < UsageLimit);
 }

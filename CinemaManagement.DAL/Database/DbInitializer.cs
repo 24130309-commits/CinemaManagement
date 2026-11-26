@@ -1,8 +1,12 @@
-using System.Reflection;
 using Dapper;
 
 namespace CinemaManagement.DAL.Database;
 
+/// <summary>
+/// Verifies that the configured, existing database is available.
+/// The application treats its schema as a fixed contract and must not
+/// create, migrate, or rewrite it during startup.
+/// </summary>
 public sealed class DbInitializer
 {
     private readonly SqliteConnectionFactory _factory;
@@ -14,28 +18,23 @@ public sealed class DbInitializer
 
     public void Initialize()
     {
-        var assembly = Assembly.GetExecutingAssembly();
-
-        var resource = assembly.GetManifestResourceNames()
-            .SingleOrDefault(x =>
-                x.EndsWith("Schema.sql", StringComparison.OrdinalIgnoreCase));
-
-        if (resource == null)
+        if (string.IsNullOrWhiteSpace(_factory.DatabasePath) ||
+            !File.Exists(_factory.DatabasePath))
         {
-            throw new InvalidOperationException(
-                "Không tìm thấy tài nguyên Schema.sql.");
+            throw new FileNotFoundException(
+                "Không tìm thấy cơ sở dữ liệu hiện có. Ứng dụng không tự tạo hoặc thay thế database.",
+                _factory.DatabasePath);
         }
-
-        using var stream = assembly.GetManifestResourceStream(resource)
-                           ?? throw new InvalidOperationException(
-                               "Không thể đọc tài nguyên Schema.sql.");
-
-        using var reader = new StreamReader(stream);
-        var schema = reader.ReadToEnd();
 
         using var connection = _factory.CreateConnection();
 
-        connection.Execute(schema);
-        connection.Execute("PRAGMA journal_mode = WAL;");
+        var tableCount = connection.ExecuteScalar<long>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%';");
+
+        if (tableCount == 0)
+        {
+            throw new InvalidOperationException(
+                "Cơ sở dữ liệu hiện có không chứa bảng ứng dụng nào. Không có thay đổi nào được thực hiện.");
+        }
     }
 }

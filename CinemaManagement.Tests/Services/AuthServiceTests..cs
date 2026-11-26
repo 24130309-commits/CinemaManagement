@@ -153,6 +153,8 @@ public class AuthServiceTests
     [Test]
     public void ChangePassword_WithCorrectOldPassword_UpdatesPassword()
     {
+        SignInAdmin();
+
         Assert.DoesNotThrow(() =>
             _auth.ChangePassword(
                 1,
@@ -172,6 +174,8 @@ public class AuthServiceTests
     [Test]
     public void ChangePassword_WithWrongOldPassword_ThrowsBusinessException()
     {
+        SignInAdmin();
+
         Assert.Throws<BusinessException>(() =>
             _auth.ChangePassword(
                 1,
@@ -182,6 +186,8 @@ public class AuthServiceTests
     [Test]
     public void ChangePassword_WithWeakNewPassword_ThrowsBusinessException()
     {
+        SignInAdmin();
+
         Assert.Throws<BusinessException>(() =>
             _auth.ChangePassword(
                 1,
@@ -192,11 +198,41 @@ public class AuthServiceTests
     [Test]
     public void ChangePassword_WithSamePassword_ThrowsBusinessException()
     {
+        SignInAdmin();
+
         Assert.Throws<BusinessException>(() =>
             _auth.ChangePassword(
                 1,
                 "ValidPass123",
                 "ValidPass123"));
+    }
+
+    [Test]
+    public void ChangePassword_RejectsUnauthenticatedCaller()
+    {
+        Assert.Throws<BusinessException>(() =>
+            _auth.ChangePassword(1, "ValidPass123", "NewPassword456"));
+    }
+
+    [Test]
+    public void ChangePassword_RejectsChangingAnotherAccount()
+    {
+        _users.Insert(new User
+        {
+            Id = 2,
+            Username = "other",
+            PasswordHash = _auth.HashPassword("OtherPass123"),
+            FullName = "Other User",
+            Role = UserRole.Staff,
+            IsActive = true
+        });
+        SignInAdmin();
+
+        Assert.Throws<BusinessException>(() =>
+            _auth.ChangePassword(2, "OtherPass123", "NewPassword456"));
+        Assert.That(
+            _auth.VerifyPassword("OtherPass123", _users.GetById(2)!.PasswordHash),
+            Is.True);
     }
 
     [Test]
@@ -212,6 +248,27 @@ public class AuthServiceTests
 
         Assert.That(_session.User, Is.Null);
         Assert.That(_session.IsAuthenticated, Is.False);
+    }
+
+    [Test]
+    public void LoginAndLogout_KeepSessionConsistentWhenAuditLoggingFails()
+    {
+        var auth = new AuthService(
+            _users,
+            _session,
+            new UserValidator(),
+            new ThrowingAuditService());
+
+        Assert.DoesNotThrow(() => auth.Login("admin", "ValidPass123"));
+        Assert.That(_session.IsAuthenticated, Is.True);
+
+        Assert.DoesNotThrow(auth.Logout);
+        Assert.That(_session.IsAuthenticated, Is.False);
+    }
+
+    private void SignInAdmin()
+    {
+        _auth.Login("admin", "ValidPass123");
     }
 
     private sealed class InMemoryUserRepository : IUserRepository
@@ -296,5 +353,16 @@ public class AuthServiceTests
 
             return true;
         }
+    }
+
+    private sealed class ThrowingAuditService : IAuditService
+    {
+        public void Log(string action, string entityName, int? entityId, string details)
+        {
+            throw new IOException("Test audit failure");
+        }
+
+        public IEnumerable<CinemaManagement.Core.Entities.AuditLog> Search(int userId, DateTime from, DateTime to) => [];
+        public IEnumerable<CinemaManagement.Core.Entities.AuditLog> GetRecentLogs(int limit = 100) => [];
     }
 }

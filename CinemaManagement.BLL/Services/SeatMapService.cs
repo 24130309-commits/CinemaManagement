@@ -1,112 +1,108 @@
-﻿using CinemaManagement.Core.DTOs;
+﻿
+using CinemaManagement.Core.DTOs;
 using CinemaManagement.Core.Enums;
 using CinemaManagement.Core.Exceptions;
 using CinemaManagement.Core.Interfaces;
-using Microsoft.Data.Sqlite;
+using CinemaManagement.BLL.Session;
 
 namespace CinemaManagement.BLL.Services;
 
-public class SeatMapService : ISeatMapService
+public sealed class SeatMapService : ISeatMapService
 {
-    private readonly IShowtimeRepository _showtimeRepo;
-    private readonly ITicketRepository _ticketRepo;
-    private readonly ISeatHoldRepository _seatHoldRepo;
-    private readonly string _connectionString;
+    private readonly IShowtimeRepository _showtimes;
+    private readonly ITicketRepository _tickets;
+    private readonly ISeatHoldRepository _holds;
+    private readonly ISeatRepository _seats;
+    private readonly IRoomRepository _rooms;
+    private readonly IPricingService _pricing;
+    private readonly CurrentUserSession _session;
 
     public SeatMapService(
-        IShowtimeRepository showtimeRepo,
-        ITicketRepository ticketRepo,
-        ISeatHoldRepository seatHoldRepo,
-        string connectionString = "Data Source=cinema.db")
+        IShowtimeRepository showtimes,
+        ITicketRepository tickets,
+        ISeatHoldRepository holds,
+        ISeatRepository seats,
+        IPricingService pricing,
+        IRoomRepository rooms,
+        CurrentUserSession session)
     {
-        _showtimeRepo = showtimeRepo;
-        _ticketRepo = ticketRepo;
-        _seatHoldRepo = seatHoldRepo;
-        _connectionString = connectionString;
+        _showtimes = showtimes ?? throw new ArgumentNullException(nameof(showtimes));
+        _tickets = tickets ?? throw new ArgumentNullException(nameof(tickets));
+        _holds = holds ?? throw new ArgumentNullException(nameof(holds));
+        _seats = seats ?? throw new ArgumentNullException(nameof(seats));
+        _pricing = pricing ?? throw new ArgumentNullException(nameof(pricing));
+        _rooms = rooms ?? throw new ArgumentNullException(nameof(rooms));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
     }
 
     public List<SeatDisplayDto> GetSeatMapByShowtime(int showtimeId)
     {
-        var showtime = _showtimeRepo.GetById(showtimeId)
-            ?? throw new BusinessException(
-                "Không tìm thấy suất chiếu.");
+        AuthorizationGuard.EnsureAuthenticated(_session);
+        if (showtimeId <= 0)
+            throw new BusinessException("Mã suất chiếu không hợp lệ.");
 
-        _seatHoldRepo.ReleaseExpiredHolds();
+        var showtime = _showtimes.GetById(showtimeId)
+            ?? throw new BusinessException("Không tìm thấy suất chiếu.");
 
-        var soldSeatIds = _ticketRepo
-            .GetByShowTimeId(showtimeId)
-            .Select(t => t.SeatId)
-            .ToHashSet();
-
-        var heldSeatIds = _seatHoldRepo
-            .GetActiveHoldsByShowTime(showtimeId)
-            .Where(h => !h.IsReleased && h.ExpiryTime > DateTime.Now)
-            .Select(h => h.SeatId)
-            .ToHashSet();
-
-        var result = new List<SeatDisplayDto>();
-
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
-
-        var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
-            SELECT Id, RowLabel, SeatNumber, SeatType
-            FROM Seats
-            WHERE RoomId = @RoomId
-            ORDER BY RowLabel, SeatNumber";
-
-        cmd.Parameters.AddWithValue("@RoomId", showtime.RoomId);
-
-        using var reader = cmd.ExecuteReader();
-
-        while (reader.Read())
+        if (!showtime.IsActive || showtime.StartTime <= DateTime.Now)
         {
-            int seatId = reader.GetInt32(0);
-            string rowName = reader.GetString(1);
-            int seatNumber = reader.GetInt32(2);
-
-            string seatType = reader.IsDBNull(3)
-                ? "Standard"
-                : reader.GetString(3);
-
-            var status = SeatStatus.Available;
-
-            if (soldSeatIds.Contains(seatId))
-            {
-                status = SeatStatus.Booked;
-            }
-            else if (heldSeatIds.Contains(seatId))
-            {
-                status = SeatStatus.Holding;
-            }
-
-            decimal price = CalculateSeatPrice(
-                showtime.BasePrice,
-                seatType);
-
-            result.Add(new SeatDisplayDto
-            {
-                Id = seatId,
-                RowName = rowName,
-                SeatNumber = seatNumber,
-                Status = status,
-                Price = price
-            });
+            throw new BusinessException(
+                "Suất chiếu đã ngừng hoạt động hoặc không còn nhận đặt vé.");
         }
 
-        return result;
-    }
+        var room = _rooms.GetById(showtime.RoomId);
 
-    private static decimal CalculateSeatPrice(
-        decimal basePrice,
-        string seatType)
-    {
-        return seatType.ToUpperInvariant() switch
+        if (room is null || !room.IsActive)
         {
-            "VIP" => basePrice + 20000m,
-            "COUPLE" => basePrice * 2m,
-            _ => basePrice
-        };
+            throw new BusinessException(
+                "Phòng chiếu đã ngừng hoạt động.");
+        }
+
+        _holds.ReleaseExpiredHolds();
+
+        var soldSeats = _tickets.GetByShowTimeId(showtimeId)
+            .Select(ticket => ticket.SeatId)
+            .ToHashSet();
+
+        var heldSeats = _holds.GetActiveHoldsByShowtime(showtimeId)
+            .Where(hold =>
+                !hold.IsReleased &&
+                hold.ExpiresAt > DateTime.Now)
+            .Select(hold => hold.SeatId)
+            .ToHashSet();
+
+        return _seats.GetByRoom(showtime.RoomId)
+            .OrderBy(seat => seat.RowLabel)
+            .ThenBy(seat => seat.ColNumber)
+            .Select(seat =>
+            {
+                var isAisle = seat.SeatType == SeatType.Aisle;
+
+                SeatStatus status;
+
+                if (isAisle)
+                    status = SeatStatus.Disabled;
+                else if (soldSeats.Contains(seat.Id))
+                    status = SeatStatus.Booked;
+                else if (heldSeats.Contains(seat.Id))
+                    status = SeatStatus.Holding;
+                else
+                    status = SeatStatus.Available;
+
+                return new SeatDisplayDto
+                {
+                    Id = seat.Id,
+                    RowLabel = seat.RowLabel,
+                    ColNumber = seat.ColNumber,
+                    SeatType = seat.SeatType,
+                    Status = status,
+
+                    // Lối đi không phải ghế bán vé.
+                    Price = isAisle
+                        ? 0m
+                        : _pricing.CalculateTicketPrice(showtime, seat)
+                };
+            })
+            .ToList();
     }
 }
