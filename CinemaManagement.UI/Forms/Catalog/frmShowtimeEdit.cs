@@ -203,22 +203,32 @@ public partial class frmShowtimeEdit : Form
 
         var footer = new Panel
         {
-            Dock = DockStyle.Bottom,
+            Location = new Point(0, ClientSize.Height - 65),
+            Size = new Size(ClientSize.Width, 65),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
             Height = 65,
             Padding = new Padding(24, 12, 24, 12),
-            BackColor = ThemeHelper.Surface
+            BackColor = ThemeHelper.Surface,
+            BorderStyle = BorderStyle.FixedSingle
         };
 
+        var saveButtonWidth = _editingShowtime == null ? 135 : 155;
         btnSave = new Button
         {
-            Text = "Lưu suất chiếu",
-            Location = new Point(390, 12),
-            Size = new Size(125, 36),
+            Text = _editingShowtime == null
+                ? "Xác nhận thêm"
+                : "Xác nhận cập nhật",
+            Location = new Point(515 - saveButtonWidth, 12),
+            Size = new Size(saveButtonWidth, 36),
             Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
             BackColor = ThemeHelper.Accent,
             ForeColor = ThemeHelper.Primary,
             FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            AccessibleName = _editingShowtime == null
+                ? "Xác nhận thêm suất chiếu"
+                : "Xác nhận cập nhật suất chiếu",
+            AccessibleDescription = "Kiểm tra dữ liệu và lưu suất chiếu."
         };
 
         var btnCancel = new Button
@@ -268,9 +278,25 @@ public partial class frmShowtimeEdit : Form
             btnCancel
         });
 
-        Controls.Add(content);
+        var formLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            BackColor = ThemeHelper.Background,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        formLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        formLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+        formLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        header.Dock = DockStyle.Fill;
+        content.Dock = DockStyle.Fill;
+        formLayout.Controls.Add(header, 0, 0);
+        formLayout.Controls.Add(content, 0, 1);
+        Controls.Add(formLayout);
         Controls.Add(footer);
-        Controls.Add(header);
+        footer.BringToFront();
 
         AcceptButton = btnSave;
         CancelButton = btnCancel;
