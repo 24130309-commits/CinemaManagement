@@ -17,8 +17,10 @@ public sealed class ReportRepository : IReportRepository
 
     private static object Range(DateTime from, DateTime to) => new
     {
-        From = from.Date.ToString("yyyy-MM-dd HH:mm:ss"),
-        To = to.Date.AddDays(1).ToString("yyyy-MM-dd HH:mm:ss")
+        // Keep the local offset: booking timestamps are persisted with "O"
+        // and SQLite normalizes offset timestamps to UTC in datetime().
+        From = from.Date.ToString("O"),
+        To = to.Date.AddDays(1).ToString("O")
     };
 
     public IEnumerable<RevenueByMovieDto> GetRevenueByMovie(

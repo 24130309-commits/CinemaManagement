@@ -22,12 +22,12 @@ public sealed class SettingServiceTests
             new SettingRepository(new SqliteConnectionFactory(database.Path)),
             session);
 
-        service.SaveOperationalSettings("Cinema North", 12, 30);
+        service.SaveOperationalSettings("Cinema North", 5, 30);
 
         Assert.Multiple(() =>
         {
             Assert.That(service.GetCinemaName(), Is.EqualTo("Cinema North"));
-            Assert.That(service.GetHoldMinutes(), Is.EqualTo(12));
+            Assert.That(service.GetHoldMinutes(), Is.EqualTo(5));
             Assert.That(service.GetCleaningMinutes(), Is.EqualTo(30));
         });
     }
@@ -42,6 +42,10 @@ public sealed class SettingServiceTests
 
         Assert.Throws<BusinessException>(() =>
             service.SaveOperationalSettings("", 12, 30));
+        Assert.Throws<BusinessException>(() =>
+            service.SaveOperationalSettings("Cinema North", 2, 30));
+        Assert.Throws<BusinessException>(() =>
+            service.SaveOperationalSettings("Cinema North", 6, 30));
 
         using var connection = new SqliteConnectionFactory(database.Path).CreateConnection();
         Assert.That(connection.QuerySingle<int>("SELECT COUNT(*) FROM Settings"), Is.Zero);

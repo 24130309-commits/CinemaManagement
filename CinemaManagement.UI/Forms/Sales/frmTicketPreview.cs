@@ -1,5 +1,6 @@
 ﻿
 using System.Drawing;
+using System.Drawing.Printing;
 using CinemaManagement.Core.Interfaces;
 using CinemaManagement.UI.Controls;
 using CinemaManagement.UI.Helpers;
@@ -64,6 +65,9 @@ public partial class frmTicketPreview : Form
         var close = CreateButton("Đóng", ThemeHelper.Muted);
         close.Click += (_, _) => Close();
 
+        var print = CreateButton("In vé", ThemeHelper.Primary);
+        print.Click += (_, _) => PrintTicket();
+
         _export.Text = "Xuất PDF";
         _export.AutoSize = true;
         _export.Height = 36;
@@ -75,6 +79,7 @@ public partial class frmTicketPreview : Form
         _export.Click += (_, _) => ExportPdf();
 
         footer.Controls.Add(close);
+        footer.Controls.Add(print);
         footer.Controls.Add(_export);
 
         Controls.Add(_preview);
@@ -133,6 +138,71 @@ public partial class frmTicketPreview : Form
         catch (Exception ex)
         {
             MessageHelper.Handle(ex);
+        }
+    }
+
+    private void PrintTicket()
+    {
+        if (_order.BookingId <= 0 || string.IsNullOrWhiteSpace(_preview.Text))
+            return;
+
+        try
+        {
+            using var document = new PrintDocument
+            {
+                DocumentName = $"Vé Cinema #{_order.BookingId}"
+            };
+            document.DefaultPageSettings.Margins = new Margins(32, 32, 32, 32);
+
+            var lines = _preview.Text
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Split('\n');
+            var lineIndex = 0;
+
+            document.PrintPage += (_, e) =>
+            {
+                var graphics = e.Graphics;
+                if (graphics is null)
+                {
+                    e.HasMorePages = false;
+                    return;
+                }
+
+                using var font = new Font(FontFamily.GenericMonospace, 9f);
+                var lineHeight = font.GetHeight(graphics);
+                var y = (float)e.MarginBounds.Top;
+
+                while (lineIndex < lines.Length &&
+                       y + lineHeight <= e.MarginBounds.Bottom)
+                {
+                    graphics.DrawString(
+                        lines[lineIndex],
+                        font,
+                        Brushes.Black,
+                        e.MarginBounds.Left,
+                        y);
+                    y += lineHeight;
+                    lineIndex++;
+                }
+
+                e.HasMorePages = lineIndex < lines.Length;
+            };
+
+            using var dialog = new PrintDialog
+            {
+                Document = document,
+                UseEXDialog = true
+            };
+
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                document.Print();
+                MessageHelper.Info("Đã gửi vé đến máy in.");
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageHelper.Handle(ex, "Không thể in vé.");
         }
     }
 

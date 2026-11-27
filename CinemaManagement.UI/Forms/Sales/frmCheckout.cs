@@ -19,14 +19,21 @@ public partial class frmCheckout : Form
     private readonly TextBox _promotionCode = new();
     private readonly Label _discountLabel = new();
     private readonly Label _total = new();
+    private readonly Label _holdCountdown = new();
     private readonly TextBox _details = new();
     private readonly Button _confirm = new();
+    private readonly System.Windows.Forms.Timer _holdTimer = new()
+    {
+        Interval = 1000
+    };
 
     private decimal _subtotal;
     private decimal _ticketTotal;
     private decimal _productTotal;
     private string _seatNames = string.Empty;
     private bool _productPricesUpdated;
+    private bool _holdExpired;
+    private bool _paymentConfirmationOpen;
 
     public frmCheckout(
         SalesOrderContext order,
@@ -45,6 +52,14 @@ public partial class frmCheckout : Form
 
         BuildUi();
         LoadSummary();
+        _holdTimer.Tick += (_, _) => UpdateHoldCountdown();
+        _holdTimer.Start();
+        Shown += (_, _) => UpdateHoldCountdown();
+        FormClosed += (_, _) =>
+        {
+            _holdTimer.Stop();
+            _holdTimer.Dispose();
+        };
         ThemeHelper.Apply(this);
         ThemeHelper.FitToWorkingArea(this, new Size(760, 700), new Size(650, 520));
     }
@@ -76,7 +91,7 @@ public partial class frmCheckout : Form
         var footer = new Panel
         {
             Dock = DockStyle.Bottom,
-            Height = 220,
+            Height = 250,
             BackColor = Color.White,
             Padding = new Padding(14)
         };
@@ -139,6 +154,11 @@ public partial class frmCheckout : Form
         _discountLabel.ForeColor = ThemeHelper.Success;
         _discountLabel.TextAlign = ContentAlignment.MiddleLeft;
 
+        _holdCountdown.Dock = DockStyle.Top;
+        _holdCountdown.Height = 22;
+        _holdCountdown.ForeColor = ThemeHelper.Danger;
+        _holdCountdown.TextAlign = ContentAlignment.MiddleLeft;
+
         _total.Dock = DockStyle.Top;
         _total.Height = 36;
         _total.Font = new Font("Segoe UI", 15, FontStyle.Bold);
@@ -157,6 +177,7 @@ public partial class frmCheckout : Form
 
         footer.Controls.Add(_confirm);
         footer.Controls.Add(_total);
+        footer.Controls.Add(_holdCountdown);
         footer.Controls.Add(_discountLabel);
         footer.Controls.Add(promotionPanel);
         footer.Controls.Add(_payment);
@@ -375,6 +396,7 @@ public partial class frmCheckout : Form
             0,
             _subtotal - _order.Discount);
 
+        _paymentConfirmationOpen = true;
         var paymentResult = MessageHelper.Decide(
             $"MÔ PHỎNG THANH TOÁN\n\n" +
             $"Phương thức: {paymentMethod}\n" +
@@ -384,6 +406,14 @@ public partial class frmCheckout : Form
             "Xác nhận kết quả thanh toán",
             MessageBoxIcon.Question,
             MessageBoxButtons.YesNoCancel);
+        _paymentConfirmationOpen = false;
+
+        if (_holdExpired)
+        {
+            MessageHelper.Warning(
+                "Thời gian giữ ghế đã hết trong lúc xác nhận. Vui lòng bắt đầu lại và chọn ghế mới.");
+            return;
+        }
 
         if (paymentResult == DialogResult.Cancel)
             return;
@@ -411,6 +441,9 @@ public partial class frmCheckout : Form
                 paymentMethod,
                 _order.PromotionCode);
 
+            _holdTimer.Stop();
+            _order.HoldExpiresAt.Clear();
+
             MessageHelper.Info(
                 "Thanh toán mô phỏng thành công!\n\n" +
                 "Hóa đơn, vé và giao dịch thanh toán đã được ghi nhận.",
@@ -426,6 +459,36 @@ public partial class frmCheckout : Form
             _confirm.Enabled = true;
             _confirm.Text = "XÁC NHẬN THANH TOÁN";
         }
+    }
+
+    private void UpdateHoldCountdown()
+    {
+        if (_order.HoldExpiresAt.Count == 0)
+        {
+            _holdCountdown.Text = "";
+            return;
+        }
+
+        var remaining = _order.HoldExpiresAt.Values.Min() - DateTime.Now;
+        if (remaining <= TimeSpan.Zero)
+        {
+            _holdExpired = true;
+            _holdTimer.Stop();
+            _holdCountdown.Text = "Đã hết thời gian giữ ghế. Giao dịch không thể thanh toán.";
+            _confirm.Enabled = false;
+
+            if (!_paymentConfirmationOpen)
+            {
+                MessageHelper.Warning(
+                    "Đã hết thời gian giữ ghế. Vui lòng đóng giao dịch và chọn ghế lại.");
+            }
+
+            return;
+        }
+
+        var totalSeconds = (int)Math.Ceiling(remaining.TotalSeconds);
+        _holdCountdown.Text =
+            $"Thời gian giữ ghế còn: {totalSeconds / 60:00}:{totalSeconds % 60:00}";
     }
 
     private static Button CreateButton(string text, Color color)

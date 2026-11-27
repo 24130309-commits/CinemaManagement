@@ -19,8 +19,8 @@ public partial class frmSettings : Form
 
     private readonly NumericUpDown _hold = new()
     {
-        Minimum = 1,
-        Maximum = 30,
+        Minimum = 3,
+        Maximum = 5,
         Width = 120
     };
 

@@ -15,6 +15,11 @@ public partial class frmComboSelection : Form
     private readonly NumericUpDown _quantity = new();
     private readonly EmptyStateDataGridView _cart = new();
     private readonly Label _total = new();
+    private readonly Label _holdCountdown = new();
+    private readonly System.Windows.Forms.Timer _holdTimer = new()
+    {
+        Interval = 1000
+    };
     private List<Product> _availableProducts = new();
 
     public frmComboSelection(IProductService products, SalesOrderContext order)
@@ -25,6 +30,14 @@ public partial class frmComboSelection : Form
         BuildUi();
         LoadProducts();
         RefreshCart();
+        _holdTimer.Tick += (_, _) => UpdateHoldCountdown();
+        _holdTimer.Start();
+        Shown += (_, _) => UpdateHoldCountdown();
+        FormClosed += (_, _) =>
+        {
+            _holdTimer.Stop();
+            _holdTimer.Dispose();
+        };
         ThemeHelper.Apply(this);
         ThemeHelper.FitToWorkingArea(this, new Size(900, 620), new Size(760, 520));
     }
@@ -121,6 +134,11 @@ public partial class frmComboSelection : Form
         _total.ForeColor = ThemeHelper.Primary;
         _total.TextAlign = ContentAlignment.MiddleLeft;
 
+        _holdCountdown.Dock = DockStyle.Bottom;
+        _holdCountdown.Height = 22;
+        _holdCountdown.ForeColor = ThemeHelper.Danger;
+        _holdCountdown.TextAlign = ContentAlignment.MiddleLeft;
+
         var remove = CreateButton("Xóa sản phẩm", ThemeHelper.Danger);
         remove.Dock = DockStyle.Right;
         remove.Click += (_, _) => RemoveProduct();
@@ -132,6 +150,7 @@ public partial class frmComboSelection : Form
         footer.Controls.Add(continueButton);
         footer.Controls.Add(remove);
         footer.Controls.Add(_total);
+        footer.Controls.Add(_holdCountdown);
 
         Controls.Add(_cart);
         Controls.Add(footer);
@@ -231,8 +250,33 @@ public partial class frmComboSelection : Form
             _cart.Rows[row].Tag = item.ProductId;
         }
 
-        var total = _order.Products.Sum(item => item.Price * item.Quantity);
-        _total.Text = $"TỔNG TIỀN SẢN PHẨM: {total:N0} đ";
+        _total.Text = $"TỔNG TIỀN SẢN PHẨM: " +
+                      $"{_order.Products.Sum(item => item.Price * item.Quantity):N0} đ";
+    }
+
+    private void UpdateHoldCountdown()
+    {
+        if (_order.HoldExpiresAt.Count == 0)
+        {
+            _holdCountdown.Text = "";
+            return;
+        }
+
+        var remaining = _order.HoldExpiresAt.Values.Min() - DateTime.Now;
+        if (remaining <= TimeSpan.Zero)
+        {
+            _holdTimer.Stop();
+            _holdCountdown.Text = "Ghế đã hết thời gian giữ";
+            MessageHelper.Warning(
+                "Đã hết thời gian giữ ghế. Giao dịch sẽ kết thúc và cần chọn ghế lại.");
+            DialogResult = DialogResult.Cancel;
+            Close();
+            return;
+        }
+
+        var totalSeconds = (int)Math.Ceiling(remaining.TotalSeconds);
+        _holdCountdown.Text =
+            $"Giữ ghế còn: {totalSeconds / 60:00}:{totalSeconds % 60:00}";
     }
 
     private void ContinueCheckout()

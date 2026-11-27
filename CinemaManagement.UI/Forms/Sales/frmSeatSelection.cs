@@ -24,6 +24,10 @@ public partial class frmSeatSelection : Form
 
     private readonly Dictionary<int, Button> _buttons = new();
     private readonly Dictionary<int, SeatDisplayDto> _seats = new();
+    private readonly System.Windows.Forms.Timer _countdownTimer = new()
+    {
+        Interval = 1000
+    };
 
     private bool _confirmed;
 
@@ -61,11 +65,15 @@ public partial class frmSeatSelection : Form
 
         BuildUi();
         LoadSeats();
+        _countdownTimer.Tick += (_, _) => UpdateCountdown();
+        _countdownTimer.Start();
         ThemeHelper.Apply(this);
         ThemeHelper.FitToWorkingArea(this, new Size(1000, 740), new Size(680, 520));
 
         FormClosing += (_, _) =>
         {
+            _countdownTimer.Stop();
+            _countdownTimer.Dispose();
             if (!_confirmed)
                 ReleaseSelectedSeats();
         };
@@ -478,6 +486,7 @@ public partial class frmSeatSelection : Form
                 }
 
                 _order.HoldIds.Remove(seat.Id);
+                _order.HoldExpiresAt.Remove(seat.Id);
                 _order.SelectedSeatIds.Remove(seat.Id);
 
                 button.BackColor = GetSeatColor(seat);
@@ -492,6 +501,7 @@ public partial class frmSeatSelection : Form
                     _order.Customer.Id);
 
                 _order.HoldIds[seat.Id] = hold.Id;
+                _order.HoldExpiresAt[seat.Id] = hold.ExpiresAt;
                 _order.SelectedSeatIds.Add(seat.Id);
 
                 button.BackColor = SelectedColor;
@@ -545,6 +555,7 @@ public partial class frmSeatSelection : Form
                     _order.Customer.Id);
 
                 _order.HoldIds[seatId] = hold.Id;
+                _order.HoldExpiresAt[seatId] = hold.ExpiresAt;
             }
             catch
             {
@@ -564,6 +575,7 @@ public partial class frmSeatSelection : Form
                 }
 
                 _order.HoldIds.Remove(seatId);
+                _order.HoldExpiresAt.Remove(seatId);
                 _order.SelectedSeatIds.Remove(seatId);
             }
         }
@@ -609,6 +621,59 @@ public partial class frmSeatSelection : Form
             : $"Ghế đã chọn: {string.Join(", ",
                 selected.Select(seat =>
                     $"{seat.RowLabel}{seat.ColNumber}"))}";
+
+        UpdateCountdownText();
+    }
+
+    private void UpdateCountdown()
+    {
+        var now = DateTime.Now;
+        var expiredSeatIds = _order.HoldExpiresAt
+            .Where(pair => pair.Value <= now)
+            .Select(pair => pair.Key)
+            .ToList();
+
+        foreach (var seatId in expiredSeatIds)
+        {
+            if (_order.HoldIds.TryGetValue(seatId, out var holdId))
+            {
+                try { _holds.ReleaseHold(holdId); }
+                catch { /* The hold may already have expired in the database. */ }
+            }
+
+            _order.HoldIds.Remove(seatId);
+            _order.SelectedSeatIds.Remove(seatId);
+            _order.HoldExpiresAt.Remove(seatId);
+        }
+
+        if (expiredSeatIds.Count > 0)
+        {
+            LoadSeats();
+            MessageHelper.Warning(
+                "Đã hết thời gian giữ ghế. Ghế được chọn đã nhả, vui lòng chọn lại.");
+            return;
+        }
+
+        UpdateCountdownText();
+    }
+
+    private void UpdateCountdownText()
+    {
+        if (_order.HoldExpiresAt.Count == 0)
+            return;
+
+        const string countdownPrefix = "    |    Thời gian giữ ghế còn:";
+        var existingCountdown = _selectedInfo.Text.IndexOf(
+            countdownPrefix,
+            StringComparison.Ordinal);
+        if (existingCountdown >= 0)
+            _selectedInfo.Text = _selectedInfo.Text[..existingCountdown];
+
+        var remaining = _order.HoldExpiresAt.Values.Min() - DateTime.Now;
+        var totalSeconds = Math.Max(0, (int)Math.Ceiling(remaining.TotalSeconds));
+        var minutes = totalSeconds / 60;
+        var seconds = totalSeconds % 60;
+        _selectedInfo.Text += $"    |    Thời gian giữ ghế còn: {minutes:00}:{seconds:00}";
     }
 
     private void ConfirmSelection()
@@ -641,6 +706,7 @@ public partial class frmSeatSelection : Form
                     _order.Customer.Id);
 
                 _order.HoldIds[seatId] = hold.Id;
+                _order.HoldExpiresAt[seatId] = hold.ExpiresAt;
             }
 
             _confirmed = true;
@@ -677,6 +743,7 @@ public partial class frmSeatSelection : Form
         }
 
         _order.HoldIds.Clear();
+        _order.HoldExpiresAt.Clear();
         _order.SelectedSeatIds.Clear();
     }
 }

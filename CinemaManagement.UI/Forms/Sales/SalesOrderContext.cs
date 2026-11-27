@@ -9,6 +9,7 @@ public sealed class SalesOrderContext
     public Customer? Customer { get; set; }
     public List<int> SelectedSeatIds { get; } = new();
     public Dictionary<int, int> HoldIds { get; } = new();
+    public Dictionary<int, DateTime> HoldExpiresAt { get; } = new();
     public List<BookingProduct> Products { get; } = new();
     public Dictionary<int, string> ProductNames { get; } = new();
     public int BookingId { get; set; }
@@ -25,6 +26,7 @@ public sealed class SalesOrderContext
         Customer = null;
         SelectedSeatIds.Clear();
         HoldIds.Clear();
+        HoldExpiresAt.Clear();
         Products.Clear();
         ProductNames.Clear();
         BookingId = 0;

@@ -27,8 +27,8 @@ public sealed class SettingService : ISettingService
         return ReadInt(
             AppConstants.SettingHoldMinutes,
             AppConstants.DefaultHoldMinutes,
-            1,
-            30);
+            3,
+            5);
     }
 
     public int GetCleaningMinutes()
@@ -82,8 +82,8 @@ public sealed class SettingService : ISettingService
         var name = cinemaName?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(name) || name.Length > 500)
             throw new BusinessException("Tên rạp không được để trống và không quá 500 ký tự.");
-        if (holdMinutes is < 1 or > 30)
-            throw new BusinessException("Thời gian giữ ghế phải từ 1 đến 30 phút.");
+        if (holdMinutes is < 3 or > 5)
+            throw new BusinessException("Thời gian giữ ghế phải từ 3 đến 5 phút.");
         if (cleaningMinutes is < 0 or > 180)
             throw new BusinessException("Thời gian dọn phòng phải từ 0 đến 180 phút.");
 
@@ -110,9 +110,9 @@ public sealed class SettingService : ISettingService
         {
             ValidateIntegerSetting(
                 value,
-                "Thời gian giữ ghế phải từ 1 đến 30 phút.",
-                1,
-                30);
+                "Thời gian giữ ghế phải từ 3 đến 5 phút.",
+                3,
+                5);
         }
 
         if (key == AppConstants.SettingCleaningMinutes)
