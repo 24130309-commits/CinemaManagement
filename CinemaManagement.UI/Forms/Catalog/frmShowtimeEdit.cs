@@ -270,6 +270,8 @@ public partial class frmShowtimeEdit : Form
             numBasePrice,
             previewPanel,
             note
+            
+            
         });
 
         footer.Controls.AddRange(new Control[]
